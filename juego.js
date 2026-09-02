@@ -1023,10 +1023,6 @@
         this.names = { creditor: "El Acreedor", inflation: "La Inflación", doubt: "La Duda",
           bias: "El Sesgo / Reflejo", impulse: "El Impulso Ciego", guilt: "La Culpa",
           dogma: "El Dogma", relativeVoid: "El Vacío Relativo" };
-        const key = `symbolic-${this.kind}`;
-        this.names = { creditor: "El Acreedor", inflation: "La Inflación", doubt: "La Duda",
-          bias: "El Sesgo / Reflejo", impulse: "El Impulso Ciego", guilt: "La Culpa",
-          dogma: "El Dogma", relativeVoid: "El Vacío Relativo" };
           
         const key = `symbolic-${this.kind}`;
         
@@ -1034,9 +1030,6 @@
            window.ArtData.makeSymbolicEntity(scene, this.kind, scene.levelInfo.accent);
         }
 
-        // No solid body: symbolic contact never blocks the guaranteed route.
-        this.sprite = scene.add.image(this.x, this.y, key).setDepth(10);
-        this.ring = scene.add.graphics().setDepth(9);
         // No solid body: symbolic contact never blocks the guaranteed route.
         this.sprite = scene.add.image(this.x, this.y, key).setDepth(10);
         this.ring = scene.add.graphics().setDepth(9);
