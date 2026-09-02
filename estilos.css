@@ -1,0 +1,52 @@
+:root {
+  color-scheme: dark;
+  --bg: #07080f;
+  --ink: #edf6ff;
+  --muted: #92a4ad;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+#game-root {
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(circle at 50% 55%, rgba(93, 239, 227, 0.08), transparent 38%),
+    linear-gradient(180deg, #090b14 0%, #05060a 100%);
+  touch-action: none;
+  user-select: none;
+}
+canvas {
+  position: relative;
+  z-index: 1;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  outline: none;
+  touch-action: none;
+  -webkit-touch-callout: none;
+}
+.fallback {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  text-align: center;
+  color: var(--muted);
+  background: #05060a;
+  z-index: 0;
+}
