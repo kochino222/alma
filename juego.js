@@ -387,25 +387,13 @@
       }
 
       createTextures() {
-        this.makeTile("tile-desert", [0x9c6b3f, 0xd7a24d, 0x5a3328, 0xffcf73]);
-        this.makeTile("tile-jungle", [0x214d31, 0x4f9b55, 0x112619, 0x8af0b0]);
-        this.makeTile("tile-volcano", [0x3f1e24, 0x7a3330, 0x160a0b, 0xff7438]);
-        this.makeTile("tile-void", [0xb8b8c6, 0xf6f3e7, 0x383a47, 0x7df7ff]);
-        this.makePlayer();
-        this.makeCoin();
-        this.makeFragment();
-        this.makeSpike();
-        this.makeBoulder();
-        this.makeCrate();
-        this.makeBomb();
-        this.makePot();
-        this.makeExit();
-        this.makeAltar();
-        this.makeSpore();
-        this.makeLadder();
-        this.makeWall();
-        this.makeParticles();
+        if (window.ArtData) {
+            window.ArtData.generateBootTextures(this);
+        } else {
+            console.error("No se encontró art_data.js. Por favor, vincúlalo en el HTML.");
+        }
       }
+    }
 
       makeTile(key, colors) {
         const g = this.make.graphics({ x: 0, y: 0, add: false });
@@ -1288,26 +1276,19 @@
           bias: "El Sesgo / Reflejo", impulse: "El Impulso Ciego", guilt: "La Culpa",
           dogma: "El Dogma", relativeVoid: "El Vacío Relativo" };
         const key = `symbolic-${this.kind}`;
-        if (!scene.textures.exists(key)) {
-          const g = scene.make.graphics({ x: 0, y: 0, add: false });
-          const color = scene.levelInfo.accent;
-          g.lineStyle(2, color, 1);
-          g.fillStyle(color, 0.22);
-          if (this.kind === "creditor" || this.kind === "inflation") {
-            g.fillRect(9, 10, 22, 22); g.strokeRect(9, 10, 22, 22);
-            g.strokeCircle(20, 9, 6); g.lineBetween(13, 33, 10, 39); g.lineBetween(27, 33, 30, 39);
-          } else if (this.kind === "doubt" || this.kind === "bias") {
-            g.fillCircle(20, 21, 13); g.strokeCircle(20, 21, 13);
-            g.lineBetween(12, 34, 9, 39); g.lineBetween(28, 34, 31, 39);
-          } else if (this.kind === "impulse" || this.kind === "guilt") {
-            g.fillTriangle(5, 34, 17, 5, 35, 25); g.strokeTriangle(5, 34, 17, 5, 35, 25);
-          } else {
-            g.fillRect(10, 4, 20, 34); g.strokeRect(10, 4, 20, 34);
-            g.strokeCircle(20, 20, 17);
-          }
-          g.fillStyle(0xffffff, 1); g.fillRect(17, 17, 4, 4); g.fillRect(25, 17, 3, 4);
-          g.generateTexture(key, 40, 42); g.destroy();
+        this.names = { creditor: "El Acreedor", inflation: "La Inflación", doubt: "La Duda",
+          bias: "El Sesgo / Reflejo", impulse: "El Impulso Ciego", guilt: "La Culpa",
+          dogma: "El Dogma", relativeVoid: "El Vacío Relativo" };
+          
+        const key = `symbolic-${this.kind}`;
+        
+        if (window.ArtData) {
+           window.ArtData.makeSymbolicEntity(scene, this.kind, scene.levelInfo.accent);
         }
+
+        // No solid body: symbolic contact never blocks the guaranteed route.
+        this.sprite = scene.add.image(this.x, this.y, key).setDepth(10);
+        this.ring = scene.add.graphics().setDepth(9);
         // No solid body: symbolic contact never blocks the guaranteed route.
         this.sprite = scene.add.image(this.x, this.y, key).setDepth(10);
         this.ring = scene.add.graphics().setDepth(9);
