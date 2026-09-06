@@ -2010,8 +2010,108 @@
         this.merchantGraphics.strokePath();
         this.merchantGraphics.lineStyle(2, biomeArch, 0.35);
         for (let i = -2; i <= 2; i += 1) this.merchantGraphics.strokeCircle(merchant.x + i * 32, merchant.y - 54, 17);
-        this.merchantGraphics.fillStyle(0xf7fbff, 1).fillCircle(merchant.x, merchant.y - 18, 9);
-        this.merchantGraphics.fillStyle(0x9dfcff, 0.3).fillTriangle(merchant.x - 22, merchant.y + 26, merchant.x, merchant.y - 8, merchant.x + 22, merchant.y + 26);
+
+        // --- Evolución narrativa del Mercader según el mundo actual ---
+        const floorY = merchant.y + 30;            // nivel del suelo de la cueva
+        const machineW = 58, machineH = 76;        // tamaño de la máquina expendedora
+        const cx = merchant.x;
+        const W = this.worldNumber;
+
+        if (W === 1 || W === 2) {
+          // Máquina expendedora rectangular: fría, puramente transaccional
+          this.merchantGraphics.fillStyle(0x20242c, 1);
+          this.merchantGraphics.fillRoundedRect(cx - machineW / 2, floorY - machineH, machineW, machineH, 5);
+          this.merchantGraphics.lineStyle(2, 0x9dfcff, 0.85);
+          this.merchantGraphics.strokeRoundedRect(cx - machineW / 2, floorY - machineH, machineW, machineH, 5);
+          // Vitrina con mercancías
+          this.merchantGraphics.fillStyle(0x0b1119, 0.92);
+          this.merchantGraphics.fillRoundedRect(cx - machineW / 2 + 6, floorY - machineH + 6, machineW - 12, 30, 3);
+          this.merchantGraphics.fillStyle(0x9dfcff, 0.16);
+          this.merchantGraphics.fillRect(cx - machineW / 2 + 8, floorY - machineH + 8, machineW - 16, 26);
+          // Mesa selector / botones luminosos
+          const btnColors = [0xff596e, 0x75f1b4, 0x9ef9ff, 0xffb14a];
+          this.merchantGraphics.fillStyle(0x10141d, 1);
+          this.merchantGraphics.fillRect(cx - machineW / 2 + 6, floorY - machineH + 41, machineW - 12, 18);
+          for (let i = 0; i < 4; i += 1) {
+            this.merchantGraphics.fillStyle(btnColors[i], 0.9);
+            this.merchantGraphics.fillCircle(cx - machineW / 2 + 14 + i * 12, floorY - machineH + 50, 3);
+          }
+          // Rejilla + ranura de entrega inferior
+          this.merchantGraphics.fillStyle(0x151b26, 1);
+          this.merchantGraphics.fillRect(cx - machineW / 2 + 10, floorY - 22, machineW - 20, 12);
+          this.merchantGraphics.fillStyle(0x0c0f16, 1);
+          this.merchantGraphics.fillRoundedRect(cx - 18, floorY - 7, 36, 7, 2);
+          this.merchantGraphics.lineStyle(1, 0xbfd9e6, 0.35);
+          this.merchantGraphics.strokeRect(cx - 18, floorY - 7, 36, 7);
+        } else if (W === 3) {
+          // Máquina rota / ladeada + entidad reparándola + chispas
+          const tilt = 0.17;
+          this.merchantGraphics.save();
+          this.merchantGraphics.translateCanvas(cx, floorY);
+          this.merchantGraphics.rotateCanvas(tilt);
+          this.merchantGraphics.fillStyle(0x2a2f3a, 1);
+          this.merchantGraphics.fillRoundedRect(-machineW / 2, -machineH, machineW, machineH, 5);
+          this.merchantGraphics.lineStyle(2, 0x5d6470, 0.9);
+          this.merchantGraphics.strokeRoundedRect(-machineW / 2, -machineH, machineW, machineH, 5);
+          // Vitrina agrietada
+          this.merchantGraphics.fillStyle(0x0b1119, 0.92);
+          this.merchantGraphics.fillRoundedRect(-machineW / 2 + 6, -machineH + 6, machineW - 12, 30, 3);
+          this.merchantGraphics.lineStyle(1, 0x9dfcff, 0.55);
+          this.merchantGraphics.beginPath();
+          this.merchantGraphics.moveTo(0, -machineH + 10);
+          this.merchantGraphics.lineTo(-12, -machineH + 24);
+          this.merchantGraphics.lineTo(6, -machineH + 34);
+          this.merchantGraphics.strokePath();
+          // Botones apagados / en cortocircuito
+          for (let i = 0; i < 4; i += 1) {
+            this.merchantGraphics.fillStyle(i % 2 ? 0xff596e : 0x3a4150, 0.6);
+            this.merchantGraphics.fillCircle(-machineW / 2 + 14 + i * 12, -machineH + 50, 3);
+          }
+          this.merchantGraphics.restore();
+          // Silueta de la entidad al lado, "arreglando" la máquina
+          const sideX = cx + machineW / 2 + 18, sideY = floorY - 4;
+          this.merchantGraphics.fillStyle(0x232a33, 0.92);
+          this.merchantGraphics.fillRoundedRect(sideX - 9, sideY - 54, 17, 32, 6);   // torso
+          this.merchantGraphics.fillCircle(sideX, sideY - 62, 9);                      // cabeza
+          this.merchantGraphics.fillRect(sideX + 4, sideY - 46, 28, 4);                // brazo hacia la máquina
+          this.merchantGraphics.fillRect(sideX - 6, sideY - 20, 3, 22);                // piernas
+          this.merchantGraphics.fillRect(sideX + 4, sideY - 20, 3, 22);
+          this.merchantGraphics.lineStyle(2, 0xffb14a, 0.9);
+          this.merchantGraphics.strokeCircle(sideX, sideY - 62, 9);
+          // Chispas (particle-fire) saliendo del panel abierto
+          this.merchantSparks = this.add.particles(cx + machineW / 4, floorY - machineH + 22, "particle-fire", {
+            lifespan: { min: 220, max: 480 },
+            speed: { min: 18, max: 85 },
+            gravityY: 260,
+            scale: { start: 0.8, end: 0 },
+            alpha: { start: 0.9, end: 0 },
+            frequency: 34,
+            maxParticles: 40,
+            emitting: true
+          }).setDepth(7);
+        } else {
+          // Mundo 4: la Entidad se muestra completa — diseño final
+          this.merchantGraphics.fillStyle(0x3a4150, 1);
+          this.merchantGraphics.fillRoundedRect(cx - machineW / 2 - 4, floorY - 8, machineW + 8, 8, 3); // plinto
+          this.merchantGraphics.lineStyle(2, 0x9ef9ff, 1);
+          this.merchantGraphics.fillStyle(0x9ef9ff, 0.16);
+          this.merchantGraphics.fillRoundedRect(cx - 13, floorY - 66, 26, 34, 6);
+          this.merchantGraphics.strokeRoundedRect(cx - 13, floorY - 66, 26, 34, 6);
+          this.merchantGraphics.fillCircle(cx, floorY - 76, 12);
+          this.merchantGraphics.strokeCircle(cx, floorY - 76, 12);
+          // Brazos de la entidad
+          this.merchantGraphics.lineBetween(cx - 10, floorY - 34, cx - 14, floorY - 6);
+          this.merchantGraphics.lineBetween(cx + 10, floorY - 34, cx + 14, floorY - 6);
+          // Halo/emblema del linaje
+          this.merchantGraphics.lineStyle(2, 0xffb14a, 0.9);
+          this.merchantGraphics.strokeCircle(cx, floorY - 76, 15);
+          // Caja dispensadora abierta a sus pies con mercancías
+          this.merchantGraphics.fillStyle(0x20242c, 1);
+          this.merchantGraphics.fillRect(cx - 30, floorY - 12, 24, 12);
+          this.merchantGraphics.fillStyle(0xffb14a, 1).fillCircle(cx - 24, floorY - 17, 3);
+          this.merchantGraphics.fillStyle(0x75f1b4, 1).fillCircle(cx - 17, floorY - 17, 3);
+          this.merchantGraphics.fillStyle(0x9ef9ff, 1).fillCircle(cx - 10, floorY - 17, 3);
+        }
         this.merchantLabel = this.add.text(merchant.x, merchant.y + 39, "MERCADER TURBIO", {
           fontFamily: "monospace", fontSize: "11px", color: "#9dfcff"
         }).setOrigin(0.5).setDepth(7);
@@ -2088,6 +2188,18 @@
           alpha: { start: 0.85, end: 0 },
           emitting: false
         }).setDepth(20);
+        // Fuente de salud: flujo sutil de motas que ascienden desde el cuenco
+        this.altarWater = this.add.particles(0, 0, "particle-blue", {
+          lifespan: { min: 520, max: 1150 },
+          speedX: { min: -14, max: 14 },
+          speedY: { min: -46, max: -16 },
+          gravityY: -14,
+          scale: { start: 0.62, end: 0 },
+          alpha: { start: 0.5, end: 0 },
+          frequency: 90,
+          maxParticles: 26,
+          emitting: false
+        }).setDepth(7);
         this.sporeMist = this.add.particles(0, 0, "particle-spore", {
           lifespan: { min: 550, max: 1150 },
           speed: { min: 8, max: 48 },
@@ -2878,6 +2990,16 @@
           if (!altar || !altar.active) return;
           if (Phaser.Math.Distance.Between(this.player.x, this.player.y, altar.x, altar.y) < 80) this.nearAltar = altar;
         });
+        // La fuente de salud mana un flujo sutil de agua mientras el Alma está cerca
+        if (this.altarWater) {
+          if (this.nearAltar) {
+            this.altarWater.x = this.nearAltar.x;
+            this.altarWater.y = this.nearAltar.y - 8;
+            this.altarWater.emitting = true;
+          } else {
+            this.altarWater.emitting = false;
+          }
+        }
         this.nearGod = Boolean(this.godZone && this.physics.overlap(this.player, this.godZone));
         this.nearDramatic = this.generated.dramaticRoutes.find(r =>
           !r.collected && Math.abs(this.player.x - r.x) < 110 && Math.abs(this.player.y - r.y) < 80) || null;

@@ -222,15 +222,40 @@ window.ArtData = (() => {
 
     makeAltar: function(scene) {
       const g = scene.make.graphics({ x: 0, y: 0, add: false });
-      g.fillStyle(0x20242c, 1);
-      g.fillRect(3, 38, 58, 14);
-      g.fillStyle(0x6d7180, 1);
-      g.fillRect(12, 20, 40, 18);
-      g.fillTriangle(16, 20, 48, 20, 32, 3);
-      g.fillStyle(0x9ef9ff, 0.7);
-      g.fillCircle(32, 20, 5);
-      g.lineStyle(2, 0xd9e3f0, 0.85);
-      g.strokeRect(12, 20, 40, 18);
+
+      // Peana / base de piedra
+      g.fillStyle(0x4c4f5c, 1);
+      g.fillRoundedRect(2, 43, 60, 11, 5);
+      g.fillStyle(0x363a46, 1);
+      g.fillRoundedRect(8, 39, 48, 6, 3);
+
+      // Pilón central de la fuente (columna de piedra)
+      g.fillStyle(0x6b7080, 1);
+      g.fillRoundedRect(24, 22, 16, 17, 4);
+      g.fillStyle(0x3f4350, 0.7);
+      g.fillRoundedRect(27, 24, 4, 14, 2);
+
+      // Cuenco superior (borde pétreo)
+      g.fillStyle(0x757a8c, 1);
+      g.fillEllipse(32, 32, 56, 16);
+      g.fillStyle(0x424650, 1);
+      g.fillEllipse(32, 35, 46, 11);
+      g.fillStyle(0x5d6270, 1);
+      g.fillEllipse(32, 32, 44, 9);
+
+      // Estanque de agua del cuenco
+      g.fillStyle(0x9ef9ff, 0.5);
+      g.fillEllipse(32, 32, 38, 6);
+
+      // Chorro de agua central
+      g.fillStyle(0x0a0d13, 1);
+      g.fillRect(29, 12, 6, 22);
+      g.fillStyle(0xaefbff, 0.9);
+      g.fillRoundedRect(30, 7, 4, 8, 2);
+      g.fillCircle(32, 5, 4);
+      g.fillStyle(0xd7feff, 0.55);
+      g.fillCircle(32, 2.5, 2.2);
+
       g.generateTexture("altar", 64, 54);
       g.destroy();
     },
