@@ -1718,6 +1718,8 @@
         this.physics.world.setBounds(0, 0, this.generated.cols * TILE, this.generated.rows * TILE + 360);
         this.input.on("pointerdown", () => { AUDIO.unlock(); AUDIO.setDrone(this.levelInfo); });
         this.input.keyboard.on("keydown", () => { AUDIO.unlock(); AUDIO.setDrone(this.levelInfo); });
+        this.input.keyboard.on("keydown-ESC", this.pauseGame, this);
+        this.input.keyboard.on("keydown-P", this.pauseGame, this);
         AUDIO.setDrone(this.levelInfo);
       }
 
@@ -2121,6 +2123,14 @@
           align: "right",
           lineSpacing: 5
         }).setOrigin(1, 0).setScrollFactor(0).setDepth(901);
+        this.pauseBtn = this.add.text(sw - 16, 20, "❚❚", {
+          fontFamily: "monospace",
+          fontSize: `${screenW(this) < 520 ? 13 : 15}px`,
+          color: "#eefcff",
+          backgroundColor: "rgba(2, 5, 12, 0.72)",
+          padding: { left: 10, right: 10, top: 7, bottom: 7 }
+        }).setOrigin(1, 0.5).setScrollFactor(0).setDepth(903).setInteractive({ useHandCursor: true });
+        this.pauseBtn.on("pointerdown", () => this.pauseGame());
         this.darkness = this.add.graphics().setScrollFactor(0).setDepth(850);
         this.lightGlow = this.add.graphics().setScrollFactor(0).setDepth(851);
         this.layoutHud();
@@ -2149,8 +2159,15 @@
         this.promptText.setPosition(short ? sw - 12 : sw / 2, short ? 14 : sh - (likelyTouch ? 205 : 56));
         this.promptText.setFontSize(narrow ? 12 : 15);
         this.promptText.setWordWrapWidth(short ? Math.max(140, sw - hudW - 68) : Math.min(650, sw - 64));
-        this.lawText.setPosition(sw - 22, 20);
+        this.lawText.setPosition(sw - 22, this.pauseBtn.y + this.pauseBtn.height / 2 + 12);
         this.lawText.setVisible(sw >= 760 && !short);
+      }
+
+      pauseGame() {
+        if (this.ending) return;
+        if (this.scene.isPaused("Game")) return;
+        this.scene.pause();
+        this.scene.launch("Pause");
       }
 
       setupCollisions() {
@@ -3868,6 +3885,59 @@
       }
     }
 
+class PauseScene extends Phaser.Scene {
+      constructor() {
+        super("Pause");
+      }
+
+      create() {
+        const sw = screenW(this);
+        const sh = screenH(this);
+        const narrow = sw < 520;
+        this.resumed = false;
+        this.overlay = this.add.rectangle(0, 0, sw, sh, 0x000000, 0.75).setOrigin(0);
+        this.title = this.add.text(sw / 2, sh / 2 - 30, "PAUSADO", {
+          fontFamily: "monospace",
+          fontSize: `${narrow ? 34 : 46}px`,
+          color: "#f7fbff",
+          align: "center"
+        }).setOrigin(0.5).setShadow(0, 0, "#99f7ff", 12);
+        this.resumeText = this.add.text(sw / 2, sh / 2 + 40, "Tocar para Reanudar", {
+          fontFamily: "monospace",
+          fontSize: `${narrow ? 16 : 20}px`,
+          color: "#a7f7ff",
+          align: "center",
+          backgroundColor: "rgba(4, 8, 16, 0.72)",
+          padding: { left: 18, right: 18, top: 10, bottom: 10 }
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        this.resumeText.on("pointerdown", () => this.resumeGame());
+        this.resumeText.on("pointerover", () => this.resumeText.setColor("#f7fbff"));
+        this.resumeText.on("pointerout", () => this.resumeText.setColor("#a7f7ff"));
+        this.input.on("pointerdown", () => AUDIO.unlock());
+        this.input.keyboard.on("keydown-ESC", this.resumeGame, this);
+        this.input.keyboard.on("keydown-P", this.resumeGame, this);
+        this.scale.on("resize", this.layout, this);
+        this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scale.off("resize", this.layout, this));
+      }
+
+      layout() {
+        const sw = screenW(this);
+        const sh = screenH(this);
+        this.overlay.setSize(sw, sh);
+        this.overlay.displayWidth = sw;
+        this.overlay.displayHeight = sh;
+        this.title.setPosition(sw / 2, sh / 2 - 30);
+        this.resumeText.setPosition(sw / 2, sh / 2 + 40);
+      }
+
+      resumeGame() {
+        if (this.resumed) return;
+        this.resumed = true;
+        AUDIO.unlock();
+        this.scene.stop();
+        this.scene.resume("Game");
+      }
+    }
     function installSelfTests() {
       window.__BLANK_SOUL_SELF_TEST__ = function runSelfTest(seedBase = "test-seed") {
         const metaCases = [
@@ -3947,7 +4017,7 @@
         autoCenter: Phaser.Scale.CENTER_BOTH,
         parent: "game-root"
       },
-      scene: [BootScene, MenuScene, GameScene, AstralScene]
+      scene: [BootScene, MenuScene, GameScene, AstralScene, PauseScene]
     };
 
     window.__BLANK_SOUL_CONFIG__ = {
