@@ -75,3 +75,18 @@ Reglas de Muerte y Salvaguardas (Edge Cases):
     Disolución del Ego (Mantener 'E'): Nunca fuerza el cambio de escena directo. Iguala la vida a 0 y llama al flujo de muerte estándar.
 
     Golpe Sísmico (Abajo + 'E'): Cuesta 1 HP. Incluye una guarda estricta: es imposible ejecutarlo si el jugador ya inició su secuencia de muerte. Si el costo de 1 HP resulta letal, el personaje ejecuta la explosión de roca e inmediatamente invoca la animación de muerte.
+
+    ## 7. Mecánicas RPG y Degradación de Objetos
+El jugador ahora administra un inventario persistente. Los objetos (como las Botas Pluma o el Espejo) no son solo ventajas pasivas, sino entidades físicas y frágiles, representadas con íconos en el tablero/HUD.
+- **Probabilidad de Pérdida por Uso:** Las acciones extremas tienen un costo. Ejecutar habilidades como el *Golpe Sísmico* o recibir daño explosivo tiene un porcentaje de probabilidad de desgastar o destruir los objetos equipados.
+
+## 8. Evolución Narrativa de Escenografía Fixa
+La escenografía de las salas especiales evoluciona narrativamente con el descenso:
+- **El Mercader Turbio (Evolución):** 
+  - *Mundos 1 y 2:* Se presenta como una **Máquina Expendedora** automática (fría, puramente transaccional). 
+  - *Mundo 3:* La máquina aparece rota o en cortocircuito, y la "Entidad del Mercader" se revela físicamente intentando repararla.
+- **El Altar de Salud:** Se abandona el diseño de bloque rígido para convertirse visualmente en una **Fuente de Salud**, emitiendo partículas orgánicas que se integren de forma natural con los bloques de la cueva.
+
+## 9. Menú de Pausa Extendido (Glosario y Metaprogreso)
+- **Glosario Dinámico:** El menú de pausa incluirá una enciclopedia de lore (Enemigos, Biomas, Objetos, Leyes). La información es críptica al principio y se revela o amplía gradualmente a medida que el jugador interactúa con dichos elementos en sus partidas.
+- **Persistencia de Semillas:** El menú mostrará la semilla alfanumérica del mapa actual, sentando las bases para un sistema de guardado o para permitir a los jugadores compartir y repetir *runs* específicas.

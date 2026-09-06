@@ -1118,7 +1118,7 @@
             this.ballooning = false; this.projectilesReleased = false; this.y = this.homeY; this.sprite.setScale(1, 1);
           }
         }
-        if (this.kind === "bias" && time >= this.stunnedUntil) this.updateBias(time);
+        if (this.kind === "bias" && time >= this.stunnedUntil) this.updateBias(time, dt);
         if (this.kind === "inflation" && time >= this.stunnedUntil) this.updateInflation(time);
         if (this.kind === "guilt") this.updateGuilt(time);
         if (this.kind === "relativeVoid" && time >= this.stunnedUntil) this.updateRelativeVoid(time);
@@ -1213,13 +1213,29 @@
         this.scene.spark.explode(20, this.x, this.y);
       }
 
-      updateBias(time) {
+      updateBias(time, dt) {
         const history = this.scene.playerHistory || [];
-        const past = history.find(point => point.time >= time - 1050) || history[0];
+        // Delay de copia de posición ampliado de 1.0s a 1.8s (más fácil de esquivar).
+        const past = history.find(point => point.time >= time - 1800) || history[0];
         if (!past) return;
-        this.observedByPlayer = (this.scene.player.x - this.x) * this.scene.player.facing > 0 && Math.abs(this.scene.player.x - this.x) < 320;
+        const scene = this.scene;
+        this.observedByPlayer = (scene.player.x - this.x) * scene.player.facing > 0 && Math.abs(scene.player.x - this.x) < 320;
         if (!this.observedByPlayer) {
-          this.x = past.x; this.y = past.y;
+          // El Sesgo copia la posición del jugador, pero su velocidad de persecución
+          // queda limitada a un 15% menos que la del jugador para permitir escapar.
+          const playerSpeed = playerMoveSpeed(scene.featherBoots ? 0 : scene.coins, scene.meta, scene.godPowerTimer);
+          const maxBias = Math.max(36, playerSpeed * 0.85);
+          const dx = past.x - this.x;
+          const dy = (past.y || this.y) - this.y;
+          const dist = Math.hypot(dx, dy);
+          const step = maxBias * (dt / 1000);
+          if (dist > step) {
+            this.x += (dx / dist) * step;
+            this.y += (dy / dist) * step;
+          } else {
+            this.x = past.x;
+            this.y = past.y;
+          }
           this.direction = past.facing || this.direction;
         }
       }
@@ -2577,6 +2593,7 @@
         const portable = this.nearbyPortable(includeSymbolic);
         if (!portable) return false;
         const { target, type } = portable;
+        if (type !== "symbolic" && (!target?.active || !target?.body)) return false;
         this.carried = { target, type };
         if (type === "symbolic") {
           target.state = "carried";
@@ -2600,7 +2617,7 @@
         if (this.ending) return;
         if (this.carried) {
           const { target, type } = this.carried;
-          if (!target || (type !== "symbolic" && !target.active)) { this.carried = null; return; }
+          if (!target || (type === "symbolic" && !target.sprite) || (type !== "symbolic" && !target.active)) { this.carried = null; return; }
           const x = this.player.x, y = this.player.y - 28;
           if (type === "symbolic") {
             target.x = x; target.y = y; target.sprite.setPosition(x, y).setVisible(true).setAngle(Math.sin(time * 0.008) * 4);
@@ -2611,21 +2628,27 @@
         for (const thrown of this.thrownEntities || []) {
           const entity = thrown.target;
           if (!entity || entity.state !== "thrown") { thrown.dead = true; continue; }
-          thrown.vy += gravity * dt / 1000;
-          entity.x += thrown.vx * dt / 1000;
-          entity.y += thrown.vy * dt / 1000;
-          entity.sprite.setPosition(entity.x, entity.y).setAngle(entity.sprite.angle + thrown.vx * dt * 0.0012);
-          const tile = this.terrain.getTileAtWorldXY(entity.x, entity.y + 15, true);
-          let hitOther = false;
-          for (const other of this.symbolicEntities || []) {
-            if (other === entity || other.state !== "active") continue;
-            if (Math.hypot(other.x - entity.x, other.y - entity.y) < 34) {
-              other.dissipate(time); hitOther = true; break;
+          // Guarda anti-crash: si el sprite/referencia fue anulado, descartar el lanzamiento.
+          if (!entity.sprite || !entity.sprite.active) { thrown.dead = true; continue; }
+          try {
+            thrown.vy += gravity * dt / 1000;
+            entity.x += thrown.vx * dt / 1000;
+            entity.y += thrown.vy * dt / 1000;
+            entity.sprite.setPosition(entity.x, entity.y).setAngle(entity.sprite.angle + thrown.vx * dt * 0.0012);
+            const tile = this.terrain.getTileAtWorldXY(entity.x, entity.y + 15, true);
+            let hitOther = false;
+            for (const other of this.symbolicEntities || []) {
+              if (other === entity || other.state !== "active") continue;
+              if (Math.hypot(other.x - entity.x, other.y - entity.y) < 34) {
+                other.dissipate(time); hitOther = true; break;
+              }
             }
-          }
-          if (hitOther || tile?.index === 1 || time >= thrown.expires) {
-            entity.state = "dissipated"; entity.respawnAt = time + 8000; entity.sprite.setVisible(false);
-            this.blue.explode(16, entity.x, entity.y); thrown.dead = true;
+            if (hitOther || tile?.index === 1 || time >= thrown.expires) {
+              entity.state = "dissipated"; entity.respawnAt = time + 8000; entity.sprite.setVisible(false);
+              this.blue.explode(16, entity.x, entity.y); thrown.dead = true;
+            }
+          } catch (err) {
+            thrown.dead = true;
           }
         }
         this.thrownEntities = (this.thrownEntities || []).filter(item => !item.dead);
@@ -2648,23 +2671,41 @@
       }
 
       releaseCarried(soft, time) {
-        if (!this.carried) return false;
+        if (!this.carried || !this.carried.target) return false;
         const carried = this.carried;
         const dir = this.player.facing || 1;
+        // Limpiar referencias y estado visual (aura verde del portaobjetos) antes de
+        // que el objeto vuelva a entrar en las físicas activas del mundo.
         this.carried = null;
+        this.portableHalo?.clear();
         if (carried.type === "symbolic") {
           const entity = carried.target;
-          entity.state = "thrown";
-          this.thrownEntities.push({ target: entity, vx: soft ? 0 : dir * 320, vy: soft ? 20 : -140, expires: time + 2300 });
+          if (!entity?.sprite) return false;
+          try {
+            entity.state = "thrown";
+            entity.ring?.clear();
+            entity.sprite.setVisible(true);
+            this.thrownEntities = this.thrownEntities || [];
+            this.thrownEntities.push({ target: entity, vx: soft ? 0 : dir * 320, vy: soft ? 20 : -140, expires: time + 2300 });
+          } catch (err) {
+            return false;
+          }
         } else {
           const object = carried.target;
-          object.body.enable = true;
-          object.body.setMaxVelocity(360, 620);
-          object.setPosition(this.player.x + dir * 22, this.player.y - (soft ? 2 : 20));
-          object.setVelocity(soft ? 0 : dir * 320, soft ? 25 : -140);
-          object.setAngularVelocity?.(soft ? 0 : dir * 460);
-          object.thrownByPlayer = !soft;
-          object.impactSpeed = 0;
+          // Guarda anti-crash: si el objeto o su cuerpo físico ya fueron anulados
+          // (p. ej. una vasija rota), no reintroducirlo en las físicas activas.
+          if (!object || !object.active || !object.body) return false;
+          try {
+            object.body.enable = true;
+            object.body.setMaxVelocity(360, 620);
+            object.setPosition(this.player.x + dir * 22, this.player.y - (soft ? 2 : 20));
+            object.setVelocity(soft ? 0 : dir * 320, soft ? 25 : -140);
+            object.setAngularVelocity?.(soft ? 0 : dir * 460);
+            object.thrownByPlayer = !soft;
+            object.impactSpeed = 0;
+          } catch (err) {
+            return false;
+          }
         }
         AUDIO.dash();
         return true;
@@ -3175,22 +3216,23 @@
         const coinBurden = this.featherBoots ? 0 : effectiveCoinBurden(this.coins, this.meta);
         const effectiveGravity = Math.round(this.physics.world.gravity.y + coinBurden * (this.debtMass || 1));
         const speed = Math.round((playerMoveSpeed(this.featherBoots ? 0 : this.coins, this.meta, this.godPowerTimer) + (time < this.absorptionUntil ? 28 : 0)) * (this.carried ? 0.9 : 1));
-        const hearts = "#".repeat(this.hp) + "-".repeat(Math.max(0, this.maxHp - this.hp));
+        const filledHearts = Math.max(0, Math.min(this.hp || 0, this.maxHp || 0));
+        const hearts = "♥".repeat(filledHearts) + "♡".repeat(Math.max(0, (this.maxHp || 0) - filledHearts));
         const perception = time < this.doubtUntil ? `invertida ${Math.ceil((this.doubtUntil - time) / 1000)}s` : this.levelInfo.key === "jungle"
           ? (this.perceptionTimer > 0 ? (this.inverted ? "invertida" : "expandida") : "clara")
           : "clara";
         const heat = this.levelInfo.key === "volcano" ? ` · Calor ${Math.round(this.heat)}%` : "";
         const power = this.godPowerTimer > 0 ? ` · Fuego divino ${Math.ceil(this.godPowerTimer / 1000)}s` : "";
         const absorption = time < this.absorptionUntil ? `\nAbsorción ${Math.ceil((this.absorptionUntil - time) / 1000)}s · Vel. +28 · Salto +48` : "";
-        const items = [this.featherBoots ? "Botas Pluma" : "", this.guardianMirror ? "Espejo Guardián" : "",
-          this.abyssBagCharges ? `Bolsa ${this.abyssBagCharges}` : "", this.certaintyAnchor ? "Ancla" : "", this.bottledPyre ? "Pira" : "",
-          time < this.riskJumpUntil ? `Salto del Pozo ${Math.ceil((this.riskJumpUntil - time) / 1000)}s` : "",
-          time < this.riskInvulnerableUntil ? `Invulnerable ${Math.ceil((this.riskInvulnerableUntil - time) / 1000)}s` : "",
-          this.riskFog ? "Visión -50%" : ""].filter(Boolean);
+        const items = [this.featherBoots ? "🪶 Botas Pluma" : "", this.guardianMirror ? "🪞 Espejo Guardián" : "",
+          this.abyssBagCharges ? `🫙 Bolsa ${this.abyssBagCharges}` : "", this.certaintyAnchor ? "⚓ Ancla" : "", this.bottledPyre ? "🔥 Pira" : "",
+          time < this.riskJumpUntil ? `🌊 Salto del Pozo ${Math.ceil((this.riskJumpUntil - time) / 1000)}s` : "",
+          time < this.riskInvulnerableUntil ? `🛡️ Invulnerable ${Math.ceil((this.riskInvulnerableUntil - time) / 1000)}s` : "",
+          this.riskFog ? "🌫️ Visión -50%" : ""].filter(Boolean);
         this.hudText.setText([
           `Nivel ${this.worldNumber}-${this.substage} · ${this.levelInfo.name}`,
           `${this.levelInfo.concept}`,
-          `Vida ${hearts} (${this.hp}/${this.maxHp}) · Oro ${this.coins} · Bombas ${this.bombs} · Fragmentos ${this.runFragments}`,
+          `Vida ${hearts} (${this.hp}/${this.maxHp}) · 🪙 Oro ${this.coins} · 💣 Bombas ${this.bombs} · 🧩 Fragmentos ${this.runFragments}`,
           `Peso +${coinBurden}${this.creditPact ? " · Deuda +10%" : ""} · Vel. ${speed} · Gravedad ${effectiveGravity}`,
           `Percepción: ${perception}${heat}${power}${absorption}${items.length ? `\nÍtems: ${items.join(" · ")}` : ""}`
         ]);
