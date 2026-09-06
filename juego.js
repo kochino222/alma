@@ -3540,11 +3540,100 @@
       }
 
       die() {
+        // Guard: ya estamos muriendo o ya empezamos a transicionar al Astral.
         if (this.ending) return;
-        this.preserveEtherealGold();
+
+        // Requerimiento #1: marcar el estado de muerte antes de cualquier otra cosa
+        // para que update(), colisiones y otros handlers no-actúen sobre un jugador moribundo.
         this.ending = true;
-        this.stopForAstral();
-        this.startAstral(false, "death");
+
+        // Preservar oro etéreo (igual que antes) — debe ocurrir antes del freeze total.
+        this.preserveEtherealGold();
+
+        // Snapshot de la posición del jugador en el momento exacto de la muerte,
+        // porque stopForAstral() viene después y la escena se reinicia.
+        const deathX = this.player?.x ?? 0;
+        const deathY = this.player?.y ?? 0;
+
+        // Requerimiento #2: pausar las físicas del jugador manualmente.
+        // (stopForAstral() también lo hace, pero lo aplicamos YA para que el sprite
+        // quede quieto durante la animación de 1.5s. Ojo: NO llamamos stopForAstral()
+        // todavía porque hace this.time.removeAllEvents() y mataría nuestro delayedCall.)
+        if (this.player?.body) {
+          this.player.body.stop();
+          this.player.body.enable = false;
+        }
+
+        // Requerimiento #3: ocultar el sprite del jugador. El cuerpo físico ya está
+        // desactivado, así que no hay riesgo de quedar atrapado en colisiones.
+        if (this.player) {
+          this.player.setVisible(false);
+        }
+
+        // Requerimiento #4: explosión de partículas en la posición exacta del jugador.
+        // Patrón idéntico al de this.rubble (línea ~1692): emitter pre-creado,
+        // emitting:false por defecto, y luego .explode(N, x, y) para detonar.
+        // Usamos "particle-blue" + "particle-white" mezcladas en dos passes para
+        // un efecto más dramático que el rubble de color único del nivel.
+        if (!this.deathBurst) {
+          this.deathBurst = this.add.particles(0, 0, "particle-blue", {
+            lifespan: { min: 520, max: 1100 },
+            speed: { min: 90, max: 260 },
+            angle: { min: 0, max: 360 },
+            gravityY: 380,
+            scale: { start: 0.9, end: 0 },
+            alpha: { start: 1, end: 0 },
+            maxParticles: 60,
+            emitting: false
+          }).setDepth(20);
+        }
+        // Detonamos 24 partículas azules en todas direcciones.
+        this.deathBurst.explode(24, deathX, deathY);
+
+        // Segundo pass con partículas blancas para dar destello interior.
+        if (!this.deathSpark) {
+          this.deathSpark = this.add.particles(0, 0, "particle-white", {
+            lifespan: { min: 280, max: 540 },
+            speed: { min: 60, max: 180 },
+            angle: { min: 0, max: 360 },
+            gravityY: 220,
+            scale: { start: 0.6, end: 0 },
+            alpha: { start: 1, end: 0 },
+            maxParticles: 40,
+            emitting: false
+          }).setDepth(21);
+        }
+        this.deathSpark.explode(18, deathX, deathY);
+
+        // Un pequeño flash en la cámara para anclar el momento dramático.
+        this.cameras.main.flash(180, 220, 240, 255);
+
+        // Requerimiento #5: sonido de muerte sintético.
+        // No modificamos el AudioEngine (fuera del alcance). Construimos un
+        // acorde descendente con AUDIO.tone() — onda sine grave + glide negativo.
+        if (AUDIO?.unlocked) {
+          AUDIO.tone(110, 0.9, "sine", 0.16, -90);   // bajo que desciende al abismo
+          AUDIO.tone(165, 0.7, "triangle", 0.08, -130); // quinta que cae más rápido
+          AUDIO.noise(0.35, 0.05, 320);              // ruido sutil = "alma dispersándose"
+        }
+
+        // Requerimiento #6: temporizador de 1500ms antes de cambiar de escena.
+        // Recién acá invocamos stopForAstral() (que hace removeAllEvents() pero ya
+        // está nuestro delayedCall en cola y se ejecutará antes de que eso importe).
+        // Guardamos el runId y los fragmentos en locales porque después del
+        // stopForAstral() el contexto del scene puede limpiar referencias.
+        const payload = {
+          victory: false,
+          runId: this.runId,
+          runFragments: this.runFragments,
+          reachedLevel: this.levelNumber,
+          reason: "death"
+        };
+        const self = this;
+        this.time.delayedCall(1500, function() {
+          self.stopForAstral();
+          self.scene.start("Astral", payload);
+        });
       }
 
       preserveEtherealGold() {
