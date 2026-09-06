@@ -2501,6 +2501,7 @@
           if (this.tryPickupNearby(time, controls.down || Boolean(this.nearStunned))) return;
           const grounded = this.player.body.blocked.down || this.player.body.touching.down || this.onSlope;
           if (controls.down && grounded) {
+            if (this.ending || this.hp <= 0) return;
             this.seismicLifeStrike(time);
             return;
           }
@@ -2776,7 +2777,7 @@
             this.channelToneAt = time + Math.max(90, 260 - progress * 150);
             this.blue.explode(2, this.player.x + Phaser.Math.Between(-42, 42), this.player.y + Phaser.Math.Between(-34, 34));
           }
-          if (progress >= 1) { this.surrenderToAstral("dissolution"); return; }
+          if (progress >= 1) { this.hp = 0; this.die(); return; }
         } else {
           if (controls.interactReleased && this.actionHoldStartedAt && time - this.actionHoldStartedAt < 420 && this.levelInfo.key === "volcano" && !contextual) {
             this.destructiveImpulse(time);

@@ -68,3 +68,10 @@ El esquema de control táctil resuelve las limitaciones habituales del navegador
 Captura de Eventos Nativa: Listeners sobre el Canvas HTML5 con pointerEvents independientes y setPointerCapture para evitar la pérdida de eventos al deslizar el dedo.
 Interrupción de Gestos Nativos: Desactivación total de scroll, zoom y refresco al deslizar mediante touch-action: none y prevención de comportamiento predeterminado.
 D-Pad + Botones de Acción independientes: Permitir caminata y salto simultáneos en pantallas multitáctiles.
+Reglas de Muerte y Salvaguardas (Edge Cases):
+
+    Animación Estándar: Al morir, se pausan las físicas, se oculta el sprite del jugador, se emite una explosión de partículas (blancas y azules) y se espera 1.5s antes de transicionar a AstralScene.
+
+    Disolución del Ego (Mantener 'E'): Nunca fuerza el cambio de escena directo. Iguala la vida a 0 y llama al flujo de muerte estándar.
+
+    Golpe Sísmico (Abajo + 'E'): Cuesta 1 HP. Incluye una guarda estricta: es imposible ejecutarlo si el jugador ya inició su secuencia de muerte. Si el costo de 1 HP resulta letal, el personaje ejecuta la explosión de roca e inmediatamente invoca la animación de muerte.
