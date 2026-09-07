@@ -16,7 +16,7 @@
     const ROUTE_DRAMATIC = "dramatic";
     const TOTAL_STAGES = 8;
     const MAX_LAW_TIER = 1;
-    const SAVE_KEY = "blank-soul-laws-v3";
+    const SAVE_KEY = "blank-soul-save-v4";
     const RUN_FRAGMENT_KEY = "blank-soul-run-fragments-v3";
 
     const LEVELS = [
@@ -111,7 +111,8 @@
       activeEtherealBond: 1,
       activeSelectiveAmnesia: 1,
       activeGreedTransmutation: 1,
-      ascensions: 0
+      ascensions: 0,
+      medallas: []
     });
 
     const clamp = Phaser.Math.Clamp;
@@ -152,23 +153,61 @@
       return list[Math.floor(rng() * list.length)];
     }
 
+    // ===== Guardado unificado (Base64 + Ofuscación) =====
+    // El meta-progreso permanente se persiste en localStorage con la clave
+    // 'blank-soul-save-v4' y la forma base { leyes: {...}, fragmentos: N, medallas: [] }.
+    // El string JSON se ofusca con Base64 (btoa/atob). El banco de fragmentos
+    // por run (sessionStorage) se mantiene transitorio entre niveles de una run.
+
+    function toSaveShape(meta) {
+      const leyes = {};
+      for (const law of LAW_DEFS) {
+        leyes[law.key] = clamp(Math.floor(Number(meta?.[law.key]) || 0), 0, MAX_LAW_TIER);
+        const activeKey = `active${law.key[0].toUpperCase()}${law.key.slice(1)}`;
+        leyes[activeKey] = clamp(Math.floor(Number(meta?.[activeKey]) ?? (meta?.[law.key] ? 1 : 1)), 0, 1);
+      }
+      return {
+        leyes,
+        fragmentos: clamp(Math.floor(Number(meta?.fragments) || 0), 0, 999),
+        medallas: Array.isArray(meta?.medallas) ? meta.medallas.slice() : [],
+        ascensiones: clamp(Math.floor(Number(meta?.ascensions) || 0), 0, 999)
+      };
+    }
+
+    function fromSaveShape(decoded) {
+      const flat = { ...DEFAULT_META };
+      const leyes = decoded?.leyes || {};
+      flat.fragments = clamp(Math.floor(Number(decoded?.fragmentos) || 0), 0, 999);
+      flat.ascensions = clamp(Math.floor(Number(decoded?.ascensiones) || 0), 0, 999);
+      flat.medallas = Array.isArray(decoded?.medallas) ? decoded.medallas.slice() : [];
+      for (const law of LAW_DEFS) {
+        flat[law.key] = clamp(Math.floor(Number(leyes[law.key]) || 0), 0, MAX_LAW_TIER);
+        const activeKey = `active${law.key[0].toUpperCase()}${law.key.slice(1)}`;
+        flat[activeKey] = leyes[activeKey] === undefined ? (flat[law.key] ? 1 : 1) : (Number(leyes[activeKey]) ? 1 : 0);
+      }
+      return flat;
+    }
+
     function loadMeta() {
       try {
-        const saved = JSON.parse(localStorage.getItem(SAVE_KEY) || "{}");
-        return normalizeMeta(saved);
+        const raw = localStorage.getItem(SAVE_KEY);
+        if (!raw) return { ...DEFAULT_META };
+        const decoded = JSON.parse(atob(raw));
+        return normalizeMeta(fromSaveShape(decoded));
       } catch (error) {
         return { ...DEFAULT_META };
       }
     }
 
     function saveMeta(meta) {
-      localStorage.setItem(SAVE_KEY, JSON.stringify(normalizeMeta(meta)));
+      localStorage.setItem(SAVE_KEY, btoa(JSON.stringify(toSaveShape(meta))));
     }
 
     function normalizeMeta(meta) {
       const next = { ...DEFAULT_META };
       next.fragments = clamp(Math.floor(Number(meta?.fragments) || 0), 0, 999);
       next.ascensions = clamp(Math.floor(Number(meta?.ascensions) || 0), 0, 999);
+      next.medallas = Array.isArray(meta?.medallas) ? meta.medallas.slice() : [];
       for (const law of LAW_DEFS) {
         next[law.key] = clamp(Math.floor(Number(meta?.[law.key]) || 0), 0, MAX_LAW_TIER);
         const activeKey = `active${law.key[0].toUpperCase()}${law.key.slice(1)}`;
@@ -465,12 +504,27 @@
         }).setOrigin(0.5);
         help.y = seedBtn.y + seedBtn.height / 2 + (short ? 6 : (narrow ? 18 : 44));
 
+        // Herramienta Dev: botón tenue de reseteo del meta-progreso (esquina superior derecha).
+        const resetBtn = this.add.text(sw - 12, 12, "[ Resetear Progreso ]", {
+          fontFamily: "monospace",
+          fontSize: `${short ? 9 : (narrow ? 10 : 11)}px`,
+          color: "#7f929e",
+          backgroundColor: "rgba(157, 252, 255, 0.06)",
+          padding: { left: 6, right: 6, top: 4, bottom: 4 }
+        }).setOrigin(1, 0).setInteractive({ useHandCursor: true });
+        resetBtn.on("pointerdown", () => {
+          if (window.confirm("¿Borrar todo el meta-progreso de Leyes, Fragmentos y Medallas?")) {
+            localStorage.removeItem(SAVE_KEY);
+            this.scene.restart();
+          }
+        });
+
         seedBtn.on("pointerdown", () => this.promptCustomSeed());
 
         const startGame = () => {
           AUDIO.unlock();
           resetRunFragmentBank();
-          this.scene.start("Game", { level: 1, seed: `blank-${Date.now()}`, runId: newRunId(), coins: 0, fragments: 0, hp: 5 });
+          this.scene.start("Game", { level: 1, seed: `blank-${Date.now()}`, runId: newRunId(), coins: 0, fragments: 0, hp: 5, isCustomSeed: false });
         };
         start.on("pointerdown", startGame);
         this.input.keyboard.once("keydown-ENTER", startGame);
@@ -503,7 +557,7 @@
         const value = window.prompt("Ingresa la semilla del nivel:");
         if (value == null || String(value).trim() === "") return;
         resetRunFragmentBank();
-        this.scene.start("Game", { level: 1, seed: String(value).trim(), runId: newRunId(), coins: 0, fragments: 0, hp: 5 });
+        this.scene.start("Game", { level: 1, seed: String(value).trim(), runId: newRunId(), coins: 0, fragments: 0, hp: 5, isCustomSeed: true });
       }
 
       drawBackground() {
@@ -1648,6 +1702,7 @@
         this.bombs = data.bombs ?? 3;
         this.runFragments = data.fragments || runFragmentBank();
         this.stageFragmentBase = this.runFragments;
+        this.isCustomSeed = Boolean(data.isCustomSeed);
       }
 
       create() {
@@ -2280,6 +2335,16 @@
           padding: { left: 10, right: 10, top: 7, bottom: 7 }
         }).setOrigin(1, 0.5).setScrollFactor(0).setDepth(903).setInteractive({ useHandCursor: true });
         this.pauseBtn.on("pointerdown", () => this.pauseGame());
+        // Texto discreto "Modo Libre" cuando la run se inicia con Semilla Personalizada.
+        if (this.isCustomSeed) {
+          this.customSeedTag = this.add.text(24, 122, "Modo Libre: Progreso desactivado", {
+            fontFamily: "monospace",
+            fontSize: "11px",
+            color: "#ff4766",
+            backgroundColor: "rgba(4, 6, 11, 0.6)",
+            padding: { left: 6, right: 6, top: 3, bottom: 3 }
+          }).setScrollFactor(0).setDepth(902);
+        }
         this.darkness = this.add.graphics().setScrollFactor(0).setDepth(850);
         this.lightGlow = this.add.graphics().setScrollFactor(0).setDepth(851);
         this.layoutHud();
@@ -2310,6 +2375,9 @@
         this.promptText.setWordWrapWidth(short ? Math.max(140, sw - hudW - 68) : Math.min(650, sw - 64));
         this.lawText.setPosition(sw - 22, this.pauseBtn.y + this.pauseBtn.height / 2 + 12);
         this.lawText.setVisible(sw >= 760 && !short);
+        if (this.customSeedTag) {
+          this.customSeedTag.setPosition(24, this.hudBg.y + this.hudBg.displayHeight + 6);
+        }
       }
 
       pauseGame() {
@@ -3687,6 +3755,7 @@
             level: this.levelNumber + 1,
             seed: this.seed,
             runId: this.runId,
+            isCustomSeed: this.isCustomSeed,
             coins: this.coins,
             fragments: this.runFragments,
             hp: this.hp,
@@ -3736,6 +3805,7 @@
         this.scene.start("Astral", {
           victory,
           runId: this.runId,
+          isCustomSeed: this.isCustomSeed,
           runFragments: this.runFragments + bonusFragments,
           reachedLevel: this.levelNumber,
           reason
@@ -3828,6 +3898,7 @@
         const payload = {
           victory: false,
           runId: this.runId,
+          isCustomSeed: this.isCustomSeed,
           runFragments: this.runFragments,
           reachedLevel: this.levelNumber,
           reason: "death"
@@ -3875,10 +3946,12 @@
         const short = sh < 460;
         this.meta = loadMeta();
         this.runId = this.dataIn.runId || "legacy-run";
+        this.isCustomSeed = Boolean(this.dataIn.isCustomSeed);
         const bankKey = `${SAVE_KEY}:banked:${this.runId}`;
         const alreadyBanked = sessionStorage.getItem(bankKey) === "1";
         this.bankedThisVisit = alreadyBanked ? (this.dataIn.shownBanked || 0) : clamp(this.dataIn.runFragments || 0, 0, 999);
-        if (!alreadyBanked) {
+        // Anti-trampas: en Semilla Personalizada no se suman fragmentos al meta-progreso permanente.
+        if (!alreadyBanked && !this.isCustomSeed) {
           this.meta.fragments += this.bankedThisVisit;
           saveMeta(this.meta);
           sessionStorage.setItem(bankKey, "1");
@@ -4066,7 +4139,7 @@
       restartRun() {
         AUDIO.unlock();
         resetRunFragmentBank();
-        this.scene.start("Game", { level: 1, seed: `blank-${Date.now()}`, runId: newRunId(), coins: 0, fragments: 0, hp: 5 });
+        this.scene.start("Game", { level: 1, seed: `blank-${Date.now()}`, runId: newRunId(), coins: 0, fragments: 0, hp: 5, isCustomSeed: false });
       }
     }
 
