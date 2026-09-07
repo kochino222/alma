@@ -438,7 +438,7 @@
           lineSpacing: short ? 2 : 5
         }).setOrigin(0.5);
 
-        const start = this.add.text(sw / 2, short ? sh - 78 : (narrow ? Math.min(sh - 172, 470) : 374), "INICIAR DESCENSO", {
+        const start = this.add.text(sw / 2, short ? sh - 92 : (narrow ? Math.min(sh - 172, 470) : 374), "INICIAR DESCENSO", {
           fontFamily: "monospace",
           fontSize: `${short ? 15 : (narrow ? 18 : 23)}px`,
           color: "#071014",
@@ -446,7 +446,16 @@
           padding: { left: narrow ? 18 : 24, right: narrow ? 18 : 24, top: 12, bottom: 12 }
         }).setOrigin(0.5).setInteractive({ useHandCursor: true });
 
-        this.add.text(sw / 2, short ? sh - 24 : (narrow ? sh - 74 : 454), "Mover: WASD / Flechas · Saltar: Espacio\nAcción: E · Impulso: Mayús · Controles táctiles en móviles\nC borra las leyes: una nueva discusión metafísica.", {
+        const seedBtn = this.add.text(sw / 2, 0, "SEMILLA PERSONALIZADA", {
+          fontFamily: "monospace",
+          fontSize: `${short ? 12 : (narrow ? 15 : 17)}px`,
+          color: "#9dfcff",
+          backgroundColor: "rgba(157, 252, 255, 0.08)",
+          padding: { left: narrow ? 12 : 16, right: narrow ? 12 : 16, top: 8, bottom: 8 }
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+        seedBtn.y = start.y + start.height / 2 + seedBtn.height / 2 + (short ? 10 : 16);
+
+        const help = this.add.text(sw / 2, 0, "Mover: WASD / Flechas · Saltar: Espacio\nAcción: E · Impulso: Mayús · Controles táctiles en móviles\nC borra las leyes: una nueva discusión metafísica.", {
           fontFamily: "monospace",
           fontSize: `${short ? 9 : (narrow ? 11 : 14)}px`,
           color: "#7f929e",
@@ -454,6 +463,9 @@
           lineSpacing: short ? 1 : (narrow ? 3 : 6),
           wordWrap: { width: Math.min(820, sw - 38) }
         }).setOrigin(0.5);
+        help.y = seedBtn.y + seedBtn.height / 2 + (short ? 6 : (narrow ? 18 : 44));
+
+        seedBtn.on("pointerdown", () => this.promptCustomSeed());
 
         const startGame = () => {
           AUDIO.unlock();
@@ -484,6 +496,14 @@
 
       onMenuResize() {
         this.scene.restart();
+      }
+
+      promptCustomSeed() {
+        AUDIO.unlock();
+        const value = window.prompt("Ingresa la semilla del nivel:");
+        if (value == null || String(value).trim() === "") return;
+        resetRunFragmentBank();
+        this.scene.start("Game", { level: 1, seed: String(value).trim(), runId: newRunId(), coins: 0, fragments: 0, hp: 5 });
       }
 
       drawBackground() {
@@ -1633,7 +1653,7 @@
       create() {
         this.meta = loadMeta();
         this.levelInfo = LEVELS[this.worldNumber - 1] || LEVELS[0];
-        this.currentSeed = hashSeed(`${this.seed}:${this.levelInfo.key}:scene`);
+        this.currentSeed = /^\d+$/.test(String(this.seed)) ? Number(this.seed) : hashSeed(String(this.seed));
         this.rng = mulberry32(this.currentSeed);
         this.cameras.main.fadeIn(350, 4, 6, 10);
         this.cameras.main.setBackgroundColor(Phaser.Display.Color.IntegerToColor(this.levelInfo.bgTop).rgba);
@@ -1701,7 +1721,7 @@
         this.messageTimer = 4300;
 
         this.createBackground();
-        this.generated = new ProceduralMap(this.seed, this.levelInfo, this.meta, this.levelNumber).generate();
+        this.generated = new ProceduralMap(this.currentSeed, this.levelInfo, this.meta, this.levelNumber).generate();
         this.createWorld();
         this.createEntities();
         this.createPlayer();
@@ -4079,12 +4099,18 @@ class PauseScene extends Phaser.Scene {
         this.resumeText.on("pointerover", () => this.resumeText.setColor("#f7fbff"));
         this.resumeText.on("pointerout", () => this.resumeText.setColor("#a7f7ff"));
         const seedNumber = Number.isFinite(Number(data?.seed)) ? Number(data.seed) : null;
-        this.seedText = this.add.text(sw / 2, sh - (narrow ? 18 : 26), seedNumber == null ? "Semilla: —" : `Semilla: ${seedNumber}`, {
+        const seedValue = seedNumber == null ? "" : String(seedNumber);
+        this.seedText = this.add.text(sw / 2, sh - (narrow ? 18 : 26), seedNumber == null ? "Semilla: —" : `Semilla: ${seedNumber} · toca para copiar`, {
           fontFamily: "monospace",
           fontSize: `${narrow ? 11 : 13}px`,
           color: "#92a4ad",
           align: "center"
-        }).setOrigin(0.5).setAlpha(0.85);
+        }).setOrigin(0.5).setAlpha(0.85).setInteractive({ useHandCursor: true });
+        if (seedNumber != null) {
+          this.seedText.on("pointerover", () => this.seedText.setColor("#cfe3ec"));
+          this.seedText.on("pointerout", () => this.seedText.setColor("#92a4ad"));
+          this.seedText.on("pointerdown", () => this.copySeedToClipboard(seedValue));
+        }
         this.input.on("pointerdown", () => AUDIO.unlock());
         this.input.keyboard.on("keydown-ESC", this.resumeGame, this);
         this.input.keyboard.on("keydown-P", this.resumeGame, this);
@@ -4103,6 +4129,48 @@ class PauseScene extends Phaser.Scene {
         if (this.seedText) {
           this.seedText.setPosition(sw / 2, sh - (sw < 520 ? 18 : 26));
           this.seedText.setFontSize(`${sw < 520 ? 11 : 13}px`);
+        }
+      }
+
+      copySeedToClipboard(value) {
+        AUDIO.unlock();
+        const label = `Semilla: ${value} · toca para copiar`;
+        const restore = () => {
+          if (this.seedText) {
+            this.seedText.setText(label);
+            this.seedText.setColor("#92a4ad");
+          }
+        };
+        const showFeedback = () => {
+          if (!this.seedText) return;
+          this.seedText.setText(`¡Copiado! Semilla: ${value}`);
+          this.seedText.setColor("#a7f7ff");
+          this.time.delayedCall(1000, restore);
+        };
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+          navigator.clipboard.writeText(value)
+            .then(showFeedback)
+            .catch(() => { this.fallbackCopyText(value); showFeedback(); });
+        } else {
+          this.fallbackCopyText(value);
+          showFeedback();
+        }
+      }
+
+      fallbackCopyText(value) {
+        try {
+          const ta = document.createElement("textarea");
+          ta.value = value;
+          ta.setAttribute("readonly", "");
+          ta.style.position = "fixed";
+          ta.style.opacity = "0";
+          document.body.appendChild(ta);
+          ta.select();
+          ta.setSelectionRange(0, ta.value.length);
+          document.execCommand("copy");
+          document.body.removeChild(ta);
+        } catch (error) {
+          // Portapapeles no disponible: la semilla queda visible para copiarse manualmente.
         }
       }
 
