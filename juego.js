@@ -3036,7 +3036,10 @@
             this.channelToneAt = time + Math.max(90, 260 - progress * 150);
             this.blue.explode(2, this.player.x + Phaser.Math.Between(-42, 42), this.player.y + Phaser.Math.Between(-34, 34));
           }
-          if (progress >= 1) { this.hp = 0; this.die(); return; }
+          // Disolución del Ego completada: disuelve la conciencia. Marcamos la
+          // muerte como suicidio (isSuicide=true) para que die() aplique la
+          // penalización de fragmentos de forma segura.
+          if (progress >= 1) { this.hp = 0; this.die(true); return; }
         } else {
           if (controls.interactReleased && this.actionHoldStartedAt && time - this.actionHoldStartedAt < 420 && this.levelInfo.key === "volcano" && !contextual) {
             this.destructiveImpulse(time);
@@ -3812,7 +3815,7 @@
         });
       }
 
-      die() {
+      die(isSuicide = false) {
         // Guard: ya estamos muriendo o ya empezamos a transicionar al Astral.
         if (this.ending) return;
 
@@ -3822,6 +3825,30 @@
 
         // Preservar oro etéreo (igual que antes) — debe ocurrir antes del freeze total.
         this.preserveEtherealGold();
+
+        // PENALIZACIÓN DE LA "DISOLUCIÓN DEL EGO" (suicidio):
+        // Al disolver el ego se disipa la conciencia recolectada (fragmentos).
+        // Este bloque manipula EXCLUSIVAMENTE variables (lógica pura): la reducción
+        // de fragmentos se aplica siempre, pero cualquier actualización visual del
+        // HUD o sonido relacionado con fragmentos queda detrás de una guarda estricta
+        // (`if (!this.ending)`) Y de un try/catch, para que un fallo aquí jamás
+        // detenga el ciclo de Phaser ni congele el juego.
+        if (isSuicide && (this.runFragments || 0) > 0) {
+          try {
+            // Reset a nivel de variables + sin-cronización con el banco de la run.
+            this.runFragments = 0;
+            setRunFragmentBank(0);
+
+            // Guardas estrictas: con this.ending === true (como ocurre al llegar
+            // aquí) NO tocamos HUD ni sonido; el loop de update() ya no pinta el HUD.
+            if (!this.ending) this.updateHud?.(this.time.now, 0);
+            if (!this.ending && AUDIO?.unlocked) AUDIO.reject?.();
+          } catch (err) {
+            if (window.console) {
+              console.error("[Alma en Blanco] penalización de fragmentos (Disolución del Ego) falló: no se interrumpe la muerte.", err);
+            }
+          }
+        }
 
         // Snapshot de la posición del jugador en el momento exacto de la muerte,
         // porque stopForAstral() viene después y la escena se reinicia.
