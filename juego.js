@@ -1633,7 +1633,8 @@
       create() {
         this.meta = loadMeta();
         this.levelInfo = LEVELS[this.worldNumber - 1] || LEVELS[0];
-        this.rng = mulberry32(hashSeed(`${this.seed}:${this.levelInfo.key}:scene`));
+        this.currentSeed = hashSeed(`${this.seed}:${this.levelInfo.key}:scene`);
+        this.rng = mulberry32(this.currentSeed);
         this.cameras.main.fadeIn(350, 4, 6, 10);
         this.cameras.main.setBackgroundColor(Phaser.Display.Color.IntegerToColor(this.levelInfo.bgTop).rgba);
         this.physics.world.gravity.y = Math.round(BASE_GRAVITY * gravityMultiplier(this.meta) * this.debtMass);
@@ -2295,7 +2296,7 @@
         if (this.ending) return;
         if (this.scene.isPaused("Game")) return;
         this.scene.pause();
-        this.scene.launch("Pause");
+        this.scene.launch("Pause", { seed: this.currentSeed });
       }
 
       setupCollisions() {
@@ -4054,7 +4055,7 @@ class PauseScene extends Phaser.Scene {
         super("Pause");
       }
 
-      create() {
+      create(data) {
         const sw = screenW(this);
         const sh = screenH(this);
         const narrow = sw < 520;
@@ -4077,6 +4078,13 @@ class PauseScene extends Phaser.Scene {
         this.resumeText.on("pointerdown", () => this.resumeGame());
         this.resumeText.on("pointerover", () => this.resumeText.setColor("#f7fbff"));
         this.resumeText.on("pointerout", () => this.resumeText.setColor("#a7f7ff"));
+        const seedNumber = Number.isFinite(Number(data?.seed)) ? Number(data.seed) : null;
+        this.seedText = this.add.text(sw / 2, sh - (narrow ? 18 : 26), seedNumber == null ? "Semilla: —" : `Semilla: ${seedNumber}`, {
+          fontFamily: "monospace",
+          fontSize: `${narrow ? 11 : 13}px`,
+          color: "#92a4ad",
+          align: "center"
+        }).setOrigin(0.5).setAlpha(0.85);
         this.input.on("pointerdown", () => AUDIO.unlock());
         this.input.keyboard.on("keydown-ESC", this.resumeGame, this);
         this.input.keyboard.on("keydown-P", this.resumeGame, this);
@@ -4092,6 +4100,10 @@ class PauseScene extends Phaser.Scene {
         this.overlay.displayHeight = sh;
         this.title.setPosition(sw / 2, sh / 2 - 30);
         this.resumeText.setPosition(sw / 2, sh / 2 + 40);
+        if (this.seedText) {
+          this.seedText.setPosition(sw / 2, sh - (sw < 520 ? 18 : 26));
+          this.seedText.setFontSize(`${sw < 520 ? 11 : 13}px`);
+        }
       }
 
       resumeGame() {
