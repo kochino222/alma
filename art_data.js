@@ -76,10 +76,13 @@ window.ArtData = (() => {
     _drawCharacter: function(g, opts) {
       const o = opts || {};
       const dy = o.bodyDy || 0;
+      // Torso parametrizable (ensanchado en la inhalación). Defaults = diseño original.
+      const tx = o.torsoX != null ? o.torsoX : 8;
+      const tw = o.torsoW != null ? o.torsoW : 16;
       g.fillStyle(0xf7fbff, 1);
       (o.legs || []).forEach((l) => g.fillRect(l.x, l.y, l.w, l.h));
       (o.arms || []).forEach((a) => g.fillRect(a.x, a.y, a.w, a.h));
-      g.fillRoundedRect(8, 16 + dy, 16, 19, 3);
+      g.fillRoundedRect(tx, 16 + dy, tw, 19, 3);
       g.fillRoundedRect(7, 2 + dy, 18, 14, 3);
       g.fillStyle(0x0a0d15, 1);
       g.fillRect(12, 8 + dy, 3, 3);
@@ -103,24 +106,32 @@ window.ArtData = (() => {
           opts = { legs: [leg(10, 34, 10), leg(18, 34, 10)], arms: [arm(4, 18, 12), arm(23, 18, 12)], bodyDy: 0 };
           break;
 
-        case "idle-1": // Respiración sutil: el torso/cabeza suben 1px
-          opts = { legs: [leg(10, 34, 10), leg(18, 34, 10)], arms: [arm(4, 17, 12), arm(23, 17, 12)], bodyDy: 1 };
+        case "idle-1": // Inhalación: cabeza+torso suben 1px (dy -1) y el pecho se ensancha 1px a cada lado
+          opts = { legs: [leg(10, 34, 10), leg(18, 34, 10)], arms: [arm(4, 17, 12), arm(23, 17, 12)], bodyDy: -1, torsoX: 7, torsoW: 18 };
           break;
 
-        case "run-0": // Paso neutro, piernas juntas, brazos recogidos
-          opts = { legs: [leg(11, 34, 10), leg(17, 34, 10)], arms: [arm(4, 18, 8), arm(23, 18, 8)], bodyDy: 0 };
+        // === Ciclo de carrera orgánico (4 frames) ===
+        // Alternancia: CONTACTO (dy 0, torso en altura) -> CRUCE (dy 2, torso baja 2px por el peso)
+        //              -> CONTACTO contrario (dy 0) -> CRUCE contrario (dy 2).
+        // Las piernas parten SIEMPRE de la cadera (y = 34 + bodyDy) para nunca verse desconectadas;
+        // en los frames de cruce los pies se recogen (pierna más corta = pie levantado).
+        case "run-0": // Contacto: pierna adelantada plantada al frente (x21), pierna contraria
+          // extendida atrás (x6). Torso arriba, brazo contrario al frente. Peso apoyado.
+          opts = { legs: [leg(6, 34, 10), leg(21, 34, 11)], arms: [arm(4, 17, 9), arm(23, 18, 7)], bodyDy: 0 };
           break;
 
-        case "run-1": // Zancada: pierna izda atrás apoyada, derecha al frente; brazos en contra-paso
-          opts = { legs: [leg(8, 34, 10), leg(20, 34, 10)], arms: [arm(6, 18, 8), arm(21, 18, 8)], bodyDy: 0 };
+        case "run-1": // Cruce (passing): piernas se cruzan bajo el torso, pies recogidos.
+          // Torso, cabeza y brazos bajan 2px -> sensación de peso en la zancada.
+          opts = { legs: [leg(9, 36, 8), leg(18, 36, 7)], arms: [arm(5, 19, 8), arm(23, 19, 8)], bodyDy: 2 };
           break;
 
-        case "run-2": // Paso neutro alargado, brazos a mitad de péndulo
-          opts = { legs: [leg(10, 34, 10), leg(18, 34, 10)], arms: [arm(5, 18, 10), arm(22, 18, 10)], bodyDy: 0 };
+        case "run-2": // Contacto opuesto: la otra pierna se adelanta (x21) y se planta.
+          // Torso vuelve a subir; brazo contrario al nuevo pie adelantado.
+          opts = { legs: [leg(21, 34, 10), leg(6, 34, 11)], arms: [arm(23, 17, 9), arm(4, 18, 7)], bodyDy: 0 };
           break;
 
-        case "run-3": // Zancada opuesta: pierna izda al frente, derecha recogida (elevada)
-          opts = { legs: [leg(20, 34, 10), leg(22, 31, 7)], arms: [arm(21, 18, 8), arm(6, 18, 8)], bodyDy: 0 };
+        case "run-3": // Cruce opuesto: piernas de nuevo en passing, torso hundido (peso).
+          opts = { legs: [leg(18, 36, 8), leg(9, 36, 7)], arms: [arm(5, 19, 8), arm(23, 19, 8)], bodyDy: 2 };
           break;
 
         case "jump": // Salto: piernas recogidas, brazos arriba
