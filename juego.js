@@ -3103,6 +3103,12 @@
       }
 
       updateProximity() {
+        // Requerimiento #2: si el juego ya está acabando, ocultá el prompt de
+        // proximidad al instante y NO evalúes distancias contra un jugador muerto.
+        if (this.ending) {
+          this.promptText?.setText("").setVisible(false);
+          return;
+        }
         this.nearSymbolic = (this.symbolicEntities || []).filter(entity => entity.state === "active" &&
           Math.hypot(this.player.x - entity.x, this.player.y - entity.y) < 76)
           .sort((a, b) => Math.hypot(this.player.x - a.x, this.player.y - a.y) - Math.hypot(this.player.x - b.x, this.player.y - b.y))[0] || null;
@@ -3723,8 +3729,9 @@
       }
 
       takeDamage(amount, source) {
-        if (this.ending) return;
-        if (this.hp <= 0) return;
+        // Requerimiento #1: primerísima línea. Blinda contra daño letal duplicado
+        // y contra colisiones que se evalúan justo al morir (fix al Crash on Death).
+        if (this.ending || this.hp <= 0) return false;
         const time = this.time.now;
         if (source !== "abyss" && time < this.invulnUntil) return;
         if (source !== "abyss" && this.guardianMirror) {
@@ -3903,7 +3910,11 @@
         // (stopForAstral() también lo hace, pero lo aplicamos YA para que el sprite
         // quede quieto durante la animación de 1.5s. Ojo: NO llamamos stopForAstral()
         // todavía porque hace this.time.removeAllEvents() y mataría nuestro delayedCall.)
+        // Requerimiento #3: desvincular al jugador de la escalera y restaurar la
+        // gravedad normal para que un cuerpo pausado no reciba gravedad especial.
+        this.onLadder = false;
         if (this.player?.body) {
+          this.player.body.allowGravity = true;
           this.player.body.stop();
           this.player.body.enable = false;
         }
