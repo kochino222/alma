@@ -2435,6 +2435,7 @@
         }
         this.handleLadders(controls);
         this.handleMovement(controls, time, dt);
+        this.updatePlayerAnimation(time);
         if (this.ending) return;
         this.updateHandsRig?.(controls, time, dt);
         if (this.ending) return;
@@ -2594,6 +2595,49 @@
           this.footDust.explode(1, body.center.x - this.player.facing * 8, body.bottom - 1);
           this.walkDustTimer = 0;
         } else if (!onGround || !controls.axis) this.walkDustTimer = 85;
+      }
+
+      // Animación procedural del jugador. Solo visual (setTexture): no toca físicas ni
+      // colisiones. Todas las texturas "player-*" comparten el mismo lienzo (32x46),
+      // por lo que cambiar de pose no altera el body (20x35, offset 6,10).
+      updatePlayerAnimation(time) {
+        if (!this.player?.body) return;
+        const body = this.player.body;
+        const onGround = body.blocked.down || body.touching.down || this.onSlope;
+        let newKey;
+
+        // PRIORIDAD 1 — Daño: aturdido, pose de retroceso.
+        if (this.staggerUntil > time) {
+          newKey = "player-hurt";
+        }
+        // PRIORIDAD 2 — Dash: impulso activo, inclinación + motion lines.
+        else if (this.dashUntil > time) {
+          newKey = "player-dash";
+        }
+        // PRIORIDAD 3 — Aire: subiendo (jump) o cayendo (fall).
+        else if (!onGround) {
+          if (body.velocity.y < -10) {
+            newKey = "player-jump";
+          } else if (body.velocity.y > 10) {
+            newKey = "player-fall";
+          } else {
+            // Apex (|vy| <= 10): mantiene la pose de impulso ascendente.
+            newKey = "player-jump";
+          }
+        }
+        // PRIORIDAD 4 — Tierra: corriendo o quieto.
+        else if (Math.abs(body.velocity.x) > 15) {
+          // Ciclo de carrera: run-0..run-3, 100ms por frame.
+          newKey = `player-run-${Math.floor(time / 100) % 4}`;
+        } else {
+          // Idle: respiración sutil alternando idle-0 / idle-1 cada 500ms.
+          newKey = Math.floor(time / 500) % 2 === 0 ? "player-idle-0" : "player-idle-1";
+        }
+
+        // RENDIMIENTO: solo setTexture si la pose cambió de verdad.
+        if (this.player.texture.key !== newKey) {
+          this.player.setTexture(newKey);
+        }
       }
 
       squashPlayer(scaleX, scaleY, duration) {
