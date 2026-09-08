@@ -10,7 +10,18 @@ window.ArtData = (() => {
       this.makeTile(scene, "tile-void", [0xb8b8c6, 0xf6f3e7, 0x383a47, 0x7df7ff]);
       
       this.makePlayer(scene, "player", {}); // Sprite base sin accesorios
-      
+
+      // Variantes de pose del jugador (sistema de animación procedural).
+      // Todas comparten el MISMO tamaño de lienzo (32x46) para no romper el body físico.
+      const PLAYER_POSES = [
+        "idle-0", "idle-1",
+        "run-0", "run-1", "run-2", "run-3",
+        "jump", "fall", "dash", "land", "hurt"
+      ];
+      for (const p of PLAYER_POSES) {
+        this.generateCharacterFrame(scene, `player-${p}`, p, {});
+      }
+
       this.makeCoin(scene);
       this.makeFragment(scene);
       this.makeSpike(scene);
@@ -53,38 +64,116 @@ window.ArtData = (() => {
       g.destroy();
     },
 
-    // Generador dinámico de jugador con soporte de capas (Composite Sprite)
+    // Generador dinámico de jugador con soporte de capas (Composite Sprite).
+    // Delega en generateCharacterFrame con la pose neutra para conservar
+    // la textura "player" exactamente igual que antes.
     makePlayer: function(scene, key = "player", layers = {}) {
-      const g = scene.make.graphics({ x: 0, y: 0, add: false });
-      
-      // Capa 1: Cuerpo Base
-      g.fillStyle(0xf7fbff, 1);
-      g.fillRoundedRect(7, 2, 18, 14, 3);
-      g.fillRoundedRect(8, 16, 16, 19, 3);
-      g.fillRect(4, 18, 5, 12);
-      g.fillRect(23, 18, 5, 12);
-      g.fillRect(10, 34, 5, 10);
-      g.fillRect(18, 34, 5, 10);
-      
-      g.fillStyle(0x0a0d15, 1);
-      g.fillRect(12, 8, 3, 3);
-      g.fillRect(19, 8, 3, 3);
-      
-      g.fillStyle(0x98e8ff, 0.9);
-      g.fillRect(12, 24, 10, 2);
-      
-      g.lineStyle(2, 0x8ba0ad, 1);
-      g.strokeRoundedRect(7, 2, 18, 33, 3);
+      this.generateCharacterFrame(scene, key, "idle-0", layers);
+    },
 
-      // Capa 2: Accesorios de cabeza / Sombreros
+    // Dibuja el cuerpo base del personaje (silueta blanca, ojos, visor cian,
+    // contorno) reutilizando el diseño original pero parametrizable para cada pose.
+    _drawCharacter: function(g, opts) {
+      const o = opts || {};
+      const dy = o.bodyDy || 0;
+      g.fillStyle(0xf7fbff, 1);
+      (o.legs || []).forEach((l) => g.fillRect(l.x, l.y, l.w, l.h));
+      (o.arms || []).forEach((a) => g.fillRect(a.x, a.y, a.w, a.h));
+      g.fillRoundedRect(8, 16 + dy, 16, 19, 3);
+      g.fillRoundedRect(7, 2 + dy, 18, 14, 3);
+      g.fillStyle(0x0a0d15, 1);
+      g.fillRect(12, 8 + dy, 3, 3);
+      g.fillRect(19, 8 + dy, 3, 3);
+      g.fillStyle(0x98e8ff, 0.9);
+      const vDy = o.visorDy != null ? o.visorDy : dy;
+      g.fillRect(12, 24 + vDy, 10, 2);
+      g.lineStyle(2, 0x8ba0ad, 1);
+      g.strokeRoundedRect(7, 2 + dy, 18, 33, 3);
+    },
+
+    // Geometría específica de cada pose. Mantiene todas las poses en el mismo
+    // lienzo (32x46) y cada una es reconocible como el mismo personaje.
+    _drawPose: function(g, pose) {
+      const leg = (x, y, h) => ({ x: x, y: y, w: 5, h: h });
+      const arm = (x, y, h) => ({ x: x, y: y, w: 5, h: h });
+      let opts;
+
+      switch (pose) {
+        case "idle-0": // Pie neutro (idéntico a la textura base original)
+          opts = { legs: [leg(10, 34, 10), leg(18, 34, 10)], arms: [arm(4, 18, 12), arm(23, 18, 12)], bodyDy: 0 };
+          break;
+
+        case "idle-1": // Respiración sutil: el torso/cabeza suben 1px
+          opts = { legs: [leg(10, 34, 10), leg(18, 34, 10)], arms: [arm(4, 17, 12), arm(23, 17, 12)], bodyDy: 1 };
+          break;
+
+        case "run-0": // Paso neutro, piernas juntas, brazos recogidos
+          opts = { legs: [leg(11, 34, 10), leg(17, 34, 10)], arms: [arm(4, 18, 8), arm(23, 18, 8)], bodyDy: 0 };
+          break;
+
+        case "run-1": // Zancada: pierna izda atrás apoyada, derecha al frente; brazos en contra-paso
+          opts = { legs: [leg(8, 34, 10), leg(20, 34, 10)], arms: [arm(6, 18, 8), arm(21, 18, 8)], bodyDy: 0 };
+          break;
+
+        case "run-2": // Paso neutro alargado, brazos a mitad de péndulo
+          opts = { legs: [leg(10, 34, 10), leg(18, 34, 10)], arms: [arm(5, 18, 10), arm(22, 18, 10)], bodyDy: 0 };
+          break;
+
+        case "run-3": // Zancada opuesta: pierna izda al frente, derecha recogida (elevada)
+          opts = { legs: [leg(20, 34, 10), leg(22, 31, 7)], arms: [arm(21, 18, 8), arm(6, 18, 8)], bodyDy: 0 };
+          break;
+
+        case "jump": // Salto: piernas recogidas, brazos arriba
+          opts = { legs: [leg(9, 29, 8), leg(17, 29, 8)], arms: [arm(4, 12, 12), arm(23, 12, 12)], bodyDy: 0 };
+          break;
+
+        case "fall": // Caída: piernas colgando alargadas, brazos extendidos arriba
+          opts = { legs: [leg(11, 32, 12), leg(17, 32, 12)], arms: [arm(5, 13, 12), arm(22, 13, 12)], bodyDy: 0 };
+          break;
+
+        case "dash": // Embate: cuerpo inclinado al frente, piernas juntas, brazos atrás + líneas de movimiento
+          g.lineStyle(2, 0x98e8ff, 0.7);
+          g.beginPath();
+          g.moveTo(1, 15); g.lineTo(8, 15);
+          g.moveTo(1, 23); g.lineTo(8, 23);
+          g.moveTo(1, 31); g.lineTo(8, 31);
+          g.strokePath();
+          opts = { legs: [leg(6, 34, 10), leg(13, 34, 10)], arms: [arm(2, 17, 9), arm(2, 28, 9)], bodyDy: 0 };
+          break;
+
+        case "land": // Aterrizaje: cuclillas, torso compactado hacia abajo, piernas anchas
+          opts = { legs: [leg(6, 37, 7), leg(19, 37, 7)], arms: [arm(4, 22, 9), arm(23, 22, 9)], bodyDy: 5 };
+          break;
+
+        case "hurt": // Retroceso: cuerpo echado hacia atrás, brazos arriba en sobresalto
+          opts = { legs: [leg(11, 34, 10), leg(21, 34, 10)], arms: [arm(4, 12, 12), arm(24, 12, 12)], bodyDy: 0 };
+          break;
+
+        default: // Pose neutra por defecto
+          opts = { legs: [leg(10, 34, 10), leg(18, 34, 10)], arms: [arm(4, 18, 12), arm(23, 18, 12)], bodyDy: 0 };
+          break;
+      }
+
+      this._drawCharacter(g, opts);
+    },
+
+    // Generador general de un frame del personaje según "pose".
+    // Todas las poses usan un lienzo del MISMO tamaño (32x46; 42x46 si layers.tool)
+    // para no alterar el body físico del sprite.
+    generateCharacterFrame: function(scene, key, pose, layers = {}) {
+      const g = scene.make.graphics({ x: 0, y: 0, add: false });
+
+      this._drawPose(g, pose);
+
+      // Accesorios de cabeza / Sombreros (misma capa que el diseño original)
       if (layers.hat === "miner") {
         g.fillStyle(0xd39b52, 1);
         g.fillRect(6, 0, 20, 6);
         g.fillStyle(0x9dfcff, 1);
-        g.fillRect(14, 2, 4, 3); 
+        g.fillRect(14, 2, 4, 3);
       }
 
-      // Capa 3: Herramientas / Armas
+      // Herramientas / Armas (misma capa que el diseño original)
       if (layers.tool === "pickaxe") {
         g.lineStyle(3, 0x5a3328, 1);
         g.beginPath(); g.moveTo(24, 20); g.lineTo(36, 8); g.strokePath();
@@ -92,7 +181,6 @@ window.ArtData = (() => {
         g.beginPath(); g.moveTo(28, 6); g.lineTo(40, 14); g.strokePath();
       }
 
-      // Ajustamos el lienzo horizontalmente si lleva un arma en la mano
       const textureWidth = layers.tool ? 42 : 32;
       g.generateTexture(key, textureWidth, 46);
       g.destroy();
