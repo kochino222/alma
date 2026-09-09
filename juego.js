@@ -2634,47 +2634,120 @@
         } else if (!onGround || !controls.axis) this.walkDustTimer = 85;
       }
 
-      // Animación procedural del jugador. Solo visual (setTexture): no toca físicas ni
-      // colisiones. Todas las texturas "player-*" comparten el mismo lienzo (32x46),
-      // por lo que cambiar de pose no altera el body (20x35, offset 6,10).
+      // Animación procedural del jugador (ETAPA 3 — Rig Paper-Doll).
+      // Anima el contenedor this.playerRig y sus piezas (this.rigParts) con
+      // trigonometría pura: NO usa setTexture. Solo visual: no toca físicas ni
+      // colisiones (esas viven en handleMovement()). La escala X del contenedor
+      // hace el volteo (flip) según this.player.facing.
       updatePlayerAnimation(time) {
-        if (!this.player?.body) return;
+        if (!this.player?.body || !this.playerRig || !this.rigParts) return;
         const body = this.player.body;
+        const parts = this.rigParts;
         const onGround = body.blocked.down || body.touching.down || this.onSlope;
-        let newKey;
+        const vx = body.velocity.x;
+        const vy = body.velocity.y;
 
-        // PRIORIDAD 1 — Daño: aturdido, pose de retroceso.
+        // --- FLIP: todo el contenedor mira a la dirección del jugador ---
+        this.playerRig.setScale(this.player.facing, 1);
+
+        // --- Base del rig: la pose neutra creada en la ETAPA 2 ---
+        if (!this.rigAnim) {
+          this.rigAnim = {
+            torsoAngle: 0, torsoScaleY: 1, torsoY: parts.torso.y,
+            headAngle: 0, headY: parts.head.y,
+            frontLeg: 0, backLeg: 0, frontArm: 0, backArm: 0
+          };
+          this.rigTorsoBaseY = parts.torso.y;
+          this.rigHeadBaseY = parts.head.y;
+        }
+        const R = this.rigAnim;
+
+        // --- Objetivo de pose del frame actual (ángulos en grados) ---
+        let torsoAngle = 0, headAngle = 0, torsoScaleY = 1;
+        let torsoY = this.rigTorsoBaseY, headY = this.rigHeadBaseY;
+        let frontLeg = 0, backLeg = 0, frontArm = 0, backArm = 0;
+
+        // PRIORIDAD 1 — HURT: impacto. Torso inclinado atrás, brazos arriba,
+        // piernas separadas en posición de protección.
         if (this.staggerUntil > time) {
-          newKey = "player-hurt";
+          torsoAngle = -24;
+          headAngle = -24;
+          frontArm = -160; backArm = -160;
+          frontLeg = -34;  backLeg = 34;
         }
-        // PRIORIDAD 2 — Dash: impulso activo, inclinación + motion lines.
+        // PRIORIDAD 2 — DASH: impulso. Cuerpo proyectado hacia adelante
+        // (rotación del torso y la cabeza), brazos estirados hacia atrás,
+        // piernas juntas y aerodinámicas.
         else if (this.dashUntil > time) {
-          newKey = "player-dash";
+          torsoAngle = 30;
+          headAngle = 30;
+          frontArm = 26;  backArm = 30;
+          frontLeg = -8;  backLeg = 8;
         }
-        // PRIORIDAD 3 — Aire: subiendo (jump) o cayendo (fall).
+        // PRIORIDAD 3 — AIRE: subiendo o cayendo (fuera del suelo).
         else if (!onGround) {
-          if (body.velocity.y < -10) {
-            newKey = "player-jump";
-          } else if (body.velocity.y > 10) {
-            newKey = "player-fall";
+          if (vy < -10) {
+            // Subida — un brazo arriba y el otro abajo; una pierna encogida
+            // (ángulo -45) y la otra estirada.
+            frontArm = -150; backArm = 18;
+            frontLeg = -45;  backLeg = 6;
+          } else if (vy > 10) {
+            // Caída — brazos levantados por el viento, piernas rectas abajo.
+            frontArm = -150; backArm = -150;
+            frontLeg = 0;    backLeg = 0;
           } else {
-            // Apex (|vy| <= 10): mantiene la pose de impulso ascendente.
-            newKey = "player-jump";
+            // Apex (|vy| <= 10) — mantiene la pose de impulso ascendente.
+            frontArm = -150; backArm = 12;
+            frontLeg = -30;  backLeg = 4;
           }
         }
-        // PRIORIDAD 4 — Tierra: corriendo o quieto.
-        else if (Math.abs(body.velocity.x) > 15) {
-          // Ciclo de carrera: run-0..run-3, 100ms por frame.
-          newKey = `player-run-${Math.floor(time / 100) % 4}`;
-        } else {
-          // Idle: respiración sutil alternando idle-0 / idle-1 cada 500ms.
-          newKey = Math.floor(time / 500) % 2 === 0 ? "player-idle-0" : "player-idle-1";
+        // PRIORIDAD 4 — RUN: en el suelo y con velocidad horizontal.
+        else if (Math.abs(vx) > 15) {
+          // Ciclo de carrera basado en el tiempo.
+          const t = time * 0.015;
+          // Piernas: péndulo opuesto (delantera seno, trasera coseno).
+          frontLeg = Math.sin(t) * 45;
+          backLeg = Math.cos(t) * 45;
+          // Brazos: movimiento opuesto al de las piernas.
+          frontArm = Math.cos(t) * 40;
+          backArm = Math.sin(t) * 40;
+          // Bounce del torso con cada zancada; la cabeza lo acompaña.
+          const bob = Math.abs(Math.cos(t)) * 3;
+          torsoY = this.rigTorsoBaseY + bob;
+          headY = this.rigHeadBaseY + bob;
+        }
+        // PRIORIDAD 5 — IDLE: en el suelo y sin movimiento. Respiración.
+        else {
+          const breath = Math.sin(time * 0.003);
+          // Torso: leve expansión vertical al inspirar.
+          torsoScaleY = 1 + breath * 0.05;
+          torsoY = this.rigTorsoBaseY;
+          // Cabeza: sube y baja suavemente con el pecho (step arriba al inspirar).
+          headY = this.rigHeadBaseY - breath * 0.65;
         }
 
-        // RENDIMIENTO: solo setTexture si la pose cambió de verdad.
-        if (this.player.texture.key !== newKey) {
-          this.player.setTexture(newKey);
-        }
+        // --- Interpolación suave hacia el objetivo (retorno a Idle sin saltos) ---
+        const D = 0.3; // amortiguación por frame
+        R.torsoAngle = Phaser.Math.Linear(R.torsoAngle, torsoAngle, D);
+        R.headAngle = Phaser.Math.Linear(R.headAngle, headAngle, D);
+        R.torsoScaleY = Phaser.Math.Linear(R.torsoScaleY, torsoScaleY, D);
+        R.torsoY = Phaser.Math.Linear(R.torsoY, torsoY, D);
+        R.headY = Phaser.Math.Linear(R.headY, headY, D);
+        R.frontLeg = Phaser.Math.Linear(R.frontLeg, frontLeg, D);
+        R.backLeg = Phaser.Math.Linear(R.backLeg, backLeg, D);
+        R.frontArm = Phaser.Math.Linear(R.frontArm, frontArm, D);
+        R.backArm = Phaser.Math.Linear(R.backArm, backArm, D);
+
+        // --- Aplicar al rig (la rotación de Phaser va en radianes) ---
+        parts.torso.rotation = Phaser.Math.DegToRad(R.torsoAngle);
+        parts.torso.y = R.torsoY;
+        parts.torso.scaleY = R.torsoScaleY;
+        parts.head.rotation = Phaser.Math.DegToRad(R.headAngle);
+        parts.head.y = R.headY;
+        parts.frontLeg.rotation = Phaser.Math.DegToRad(R.frontLeg);
+        parts.backLeg.rotation = Phaser.Math.DegToRad(R.backLeg);
+        parts.frontArm.rotation = Phaser.Math.DegToRad(R.frontArm);
+        parts.backArm.rotation = Phaser.Math.DegToRad(R.backArm);
       }
 
       squashPlayer(scaleX, scaleY, duration) {
