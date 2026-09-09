@@ -2239,6 +2239,39 @@
         this.player.body.setDragX(0);
         this.player.facing = 1;
         this.player.wasGrounded = true;
+
+        // === RIG ESQUELÉTICO (Paper-Doll) — ETAPA 2 ===
+        // El sprite físico pasa a ser un collider Arcade invisible. Toda la fisica
+        // (setSize/setOffset/setCollideWorldBounds, etc.) se conserva intacta arriba;
+        // la representación visual ahora la lleva el contenedor this.playerRig.
+        this.player.setVisible(false);
+
+        // Contenedor visual anclado a la posicion del collider. Se mueve con el
+        // jugador en handleMovement() (ETAPA 2: solo pose neutra, aun sin animar).
+        this.playerRig = this.add.container(this.player.x, this.player.y).setDepth(8);
+
+        // Piezas del cuerpo. Los miembros pivotan desde el hombro/cadera (en lugar del
+        // centro) gracias a setOrigin(0.5, 0); sus coordenadas x/y son relativas al
+        // contenedor y arman una figura humanoide en pose neutra.
+        // Orden estricto (atras -> adelante):
+        //   backArm -> backLeg -> torso -> head -> frontLeg -> frontArm
+        const rigBackArm = this.add.sprite(-9, -8, "player-limb-back").setOrigin(0.5, 0);
+        const rigBackLeg = this.add.sprite(-4, 7, "player-limb-back").setOrigin(0.5, 0);
+        const rigTorso = this.add.sprite(0, -1, "player-torso");
+        const rigHead = this.add.sprite(0, -14, "player-head");
+        const rigFrontLeg = this.add.sprite(4, 7, "player-limb").setOrigin(0.5, 0);
+        const rigFrontArm = this.add.sprite(9, -8, "player-limb").setOrigin(0.5, 0);
+
+        // Referencias guardadas para animar (trigonometria) en la ETAPA 3.
+        this.rigParts = {
+          head: rigHead,
+          torso: rigTorso,
+          backArm: rigBackArm,
+          backLeg: rigBackLeg,
+          frontArm: rigFrontArm,
+          frontLeg: rigFrontLeg
+        };
+        this.playerRig.add([rigBackArm, rigBackLeg, rigTorso, rigHead, rigFrontLeg, rigFrontArm]);
       }
 
       createEffects() {
@@ -2463,6 +2496,10 @@
       handleMovement(controls, time, dt) {
         const body = this.player.body;
         const onGround = body.blocked.down || body.touching.down || this.onSlope;
+        // ETAPA 2: el contenedor visual sigue al collider invisible en cada frame.
+        if (this.playerRig) {
+          this.playerRig.setPosition(this.player.x, this.player.y);
+        }
         if (onGround && Math.abs(body.velocity.x) < 8 && !controls.axis) {
           if (!this.idleGroundSince) this.idleGroundSince = time;
         } else this.idleGroundSince = 0;
