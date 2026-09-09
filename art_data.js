@@ -8,19 +8,18 @@ window.ArtData = (() => {
       this.makeTile(scene, "tile-jungle", [0x214d31, 0x4f9b55, 0x112619, 0x8af0b0]);
       this.makeTile(scene, "tile-volcano", [0x3f1e24, 0x7a3330, 0x160a0b, 0xff7438]);
       this.makeTile(scene, "tile-void", [0xb8b8c6, 0xf6f3e7, 0x383a47, 0x7df7ff]);
-      
-      this.makePlayer(scene, "player", {}); // Sprite base sin accesorios
 
-      // Variantes de pose del jugador (sistema de animación procedural).
-      // Todas comparten el MISMO tamaño de lienzo (32x46) para no romper el body físico.
-      const PLAYER_POSES = [
-        "idle-0", "idle-1",
-        "run-0", "run-1", "run-2", "run-3",
-        "jump", "fall", "dash", "land", "hurt"
-      ];
-      for (const p of PLAYER_POSES) {
-        this.generateCharacterFrame(scene, `player-${p}`, p, {});
-      }
+      this.makePlayer(scene, "player", {}); // Textura base: collider físico invisible
+
+      // === Sistema de Animación Esquelética (Paper-Doll Rig) — ETAPA 1 ===
+      // Generamos texturas individuales por parte del cuerpo. En juego.js
+      // (ETAPA 2) se compondrán/posarán por separado con transform/rotation.
+      this.makePlayerTorso(scene, "player-torso");   // 16x20
+      this.makePlayerHead(scene, "player-head", {}); // 18x16
+      this.makePlayerLimb(scene, "player-limb");     // 6x14 (brazos/piernas frontales)
+      // Miembros traseros con gris muy sutil para distinguirlos del frente;
+      // alternativamente se pueden tintar en juego.js con setTint().
+      this.makePlayerLimb(scene, "player-limb-back", 0xe5e8ed);
 
       this.makeCoin(scene);
       this.makeFragment(scene);
@@ -64,136 +63,63 @@ window.ArtData = (() => {
       g.destroy();
     },
 
-    // Generador dinámico de jugador con soporte de capas (Composite Sprite).
-    // Delega en generateCharacterFrame con la pose neutra para conservar
-    // la textura "player" exactamente igual que antes.
+    // Textura base "player": marco invisible (transparente) de 32x46 que actúa
+    // como collider físico. GameScene lo usa con body.setSize(20,35).setOffset(6,10);
+    // al ser transparente no se ve, pero conserva exactamente las físicas originales.
+    // Las partes visibles se generan por separado (Torso / Head / Limb).
     makePlayer: function(scene, key = "player", layers = {}) {
-      this.generateCharacterFrame(scene, key, "idle-0", layers);
-    },
-
-    // Dibuja el cuerpo base del personaje (silueta blanca, ojos, visor cian,
-    // contorno) reutilizando el diseño original pero parametrizable para cada pose.
-    _drawCharacter: function(g, opts) {
-      const o = opts || {};
-      const dy = o.bodyDy || 0;
-      // Torso parametrizable (ensanchado en la inhalación). Defaults = diseño original.
-      const tx = o.torsoX != null ? o.torsoX : 8;
-      const tw = o.torsoW != null ? o.torsoW : 16;
-      g.fillStyle(0xf7fbff, 1);
-      (o.legs || []).forEach((l) => g.fillRect(l.x, l.y, l.w, l.h));
-      (o.arms || []).forEach((a) => g.fillRect(a.x, a.y, a.w, a.h));
-      g.fillRoundedRect(tx, 16 + dy, tw, 19, 3);
-      g.fillRoundedRect(7, 2 + dy, 18, 14, 3);
-      g.fillStyle(0x0a0d15, 1);
-      g.fillRect(12, 8 + dy, 3, 3);
-      g.fillRect(19, 8 + dy, 3, 3);
-      g.fillStyle(0x98e8ff, 0.9);
-      const vDy = o.visorDy != null ? o.visorDy : dy;
-      g.fillRect(12, 24 + vDy, 10, 2);
-      g.lineStyle(2, 0x8ba0ad, 1);
-      g.strokeRoundedRect(7, 2 + dy, 18, 33, 3);
-    },
-
-    // Geometría específica de cada pose. Mantiene todas las poses en el mismo
-    // lienzo (32x46) y cada una es reconocible como el mismo personaje.
-    _drawPose: function(g, pose) {
-      const leg = (x, y, h) => ({ x: x, y: y, w: 5, h: h });
-      const arm = (x, y, h) => ({ x: x, y: y, w: 5, h: h });
-      let opts;
-
-      switch (pose) {
-        case "idle-0": // Pie neutro (idéntico a la textura base original)
-          opts = { legs: [leg(10, 34, 10), leg(18, 34, 10)], arms: [arm(4, 18, 12), arm(23, 18, 12)], bodyDy: 0 };
-          break;
-
-        case "idle-1": // Inhalación: cabeza+torso suben 1px (dy -1) y el pecho se ensancha 1px a cada lado
-          opts = { legs: [leg(10, 34, 10), leg(18, 34, 10)], arms: [arm(4, 17, 12), arm(23, 17, 12)], bodyDy: -1, torsoX: 7, torsoW: 18 };
-          break;
-
-        // === Ciclo de carrera orgánico (4 frames) ===
-        // Alternancia: CONTACTO (dy 0, torso en altura) -> CRUCE (dy 2, torso baja 2px por el peso)
-        //              -> CONTACTO contrario (dy 0) -> CRUCE contrario (dy 2).
-        // Las piernas parten SIEMPRE de la cadera (y = 34 + bodyDy) para nunca verse desconectadas;
-        // en los frames de cruce los pies se recogen (pierna más corta = pie levantado).
-        case "run-0": // Contacto: pierna adelantada plantada al frente (x21), pierna contraria
-          // extendida atrás (x6). Torso arriba, brazo contrario al frente. Peso apoyado.
-          opts = { legs: [leg(6, 34, 10), leg(21, 34, 11)], arms: [arm(4, 17, 9), arm(23, 18, 7)], bodyDy: 0 };
-          break;
-
-        case "run-1": // Cruce (passing): piernas se cruzan bajo el torso, pies recogidos.
-          // Torso, cabeza y brazos bajan 2px -> sensación de peso en la zancada.
-          opts = { legs: [leg(9, 36, 8), leg(18, 36, 7)], arms: [arm(5, 19, 8), arm(23, 19, 8)], bodyDy: 2 };
-          break;
-
-        case "run-2": // Contacto opuesto: la otra pierna se adelanta (x21) y se planta.
-          // Torso vuelve a subir; brazo contrario al nuevo pie adelantado.
-          opts = { legs: [leg(21, 34, 10), leg(6, 34, 11)], arms: [arm(23, 17, 9), arm(4, 18, 7)], bodyDy: 0 };
-          break;
-
-        case "run-3": // Cruce opuesto: piernas de nuevo en passing, torso hundido (peso).
-          opts = { legs: [leg(18, 36, 8), leg(9, 36, 7)], arms: [arm(5, 19, 8), arm(23, 19, 8)], bodyDy: 2 };
-          break;
-
-        case "jump": // Salto: piernas recogidas, brazos arriba
-          opts = { legs: [leg(9, 29, 8), leg(17, 29, 8)], arms: [arm(4, 12, 12), arm(23, 12, 12)], bodyDy: 0 };
-          break;
-
-        case "fall": // Caída: piernas colgando alargadas, brazos extendidos arriba
-          opts = { legs: [leg(11, 32, 12), leg(17, 32, 12)], arms: [arm(5, 13, 12), arm(22, 13, 12)], bodyDy: 0 };
-          break;
-
-        case "dash": // Embate: cuerpo inclinado al frente, piernas juntas, brazos atrás + líneas de movimiento
-          g.lineStyle(2, 0x98e8ff, 0.7);
-          g.beginPath();
-          g.moveTo(1, 15); g.lineTo(8, 15);
-          g.moveTo(1, 23); g.lineTo(8, 23);
-          g.moveTo(1, 31); g.lineTo(8, 31);
-          g.strokePath();
-          opts = { legs: [leg(6, 34, 10), leg(13, 34, 10)], arms: [arm(2, 17, 9), arm(2, 28, 9)], bodyDy: 0 };
-          break;
-
-        case "land": // Aterrizaje: cuclillas, torso compactado hacia abajo, piernas anchas
-          opts = { legs: [leg(6, 37, 7), leg(19, 37, 7)], arms: [arm(4, 22, 9), arm(23, 22, 9)], bodyDy: 5 };
-          break;
-
-        case "hurt": // Retroceso: cuerpo echado hacia atrás, brazos arriba en sobresalto
-          opts = { legs: [leg(11, 34, 10), leg(21, 34, 10)], arms: [arm(4, 12, 12), arm(24, 12, 12)], bodyDy: 0 };
-          break;
-
-        default: // Pose neutra por defecto
-          opts = { legs: [leg(10, 34, 10), leg(18, 34, 10)], arms: [arm(4, 18, 12), arm(23, 18, 12)], bodyDy: 0 };
-          break;
-      }
-
-      this._drawCharacter(g, opts);
-    },
-
-    // Generador general de un frame del personaje según "pose".
-    // Todas las poses usan un lienzo del MISMO tamaño (32x46; 42x46 si layers.tool)
-    // para no alterar el body físico del sprite.
-    generateCharacterFrame: function(scene, key, pose, layers = {}) {
       const g = scene.make.graphics({ x: 0, y: 0, add: false });
+      // Marco casi imperceptible del tamaño del lienzo original (no altera el body).
+      g.fillStyle(0x000000, 0.001);
+      g.fillRect(6, 10, 20, 35);
+      g.generateTexture(key, 32, 46);
+      g.destroy();
+    },
 
-      this._drawPose(g, pose);
+    // Torso estilizado y redondeado (16x20), blanco con contorno suave para
+    // integrarse con el resto del cuerpo.
+    makePlayerTorso: function(scene, key = "player-torso") {
+      const g = scene.make.graphics({ x: 0, y: 0, add: false });
+      g.fillStyle(0xf7fbff, 1);
+      g.fillRoundedRect(0, 0, 16, 20, 4);
+      g.lineStyle(2, 0x8ba0ad, 1);
+      g.strokeRoundedRect(1, 1, 14, 18, 3);
+      // Leve acento cian en el pecho del diseño original
+      g.fillStyle(0x98e8ff, 0.12);
+      g.fillRoundedRect(2, 2, 12, 4, 2);
+      g.generateTexture(key, 16, 20);
+      g.destroy();
+    },
 
-      // Accesorios de cabeza / Sombreros (misma capa que el diseño original)
-      if (layers.hat === "miner") {
-        g.fillStyle(0xd39b52, 1);
-        g.fillRect(6, 0, 20, 6);
-        g.fillStyle(0x9dfcff, 1);
-        g.fillRect(14, 2, 4, 3);
-      }
+    // Cabeza cuadrada característica (18x16) con visor cian y ojos del diseño original.
+    makePlayerHead: function(scene, key = "player-head", layers = {}) {
+      const g = scene.make.graphics({ x: 0, y: 0, add: false });
+      g.fillStyle(0xf7fbff, 1);
+      g.fillRoundedRect(0, 0, 18, 16, 3);
+      g.lineStyle(2, 0x8ba0ad, 1);
+      g.strokeRoundedRect(1, 1, 16, 14, 2);
+      // Ojos
+      g.fillStyle(0x0a0d15, 1);
+      g.fillRect(4, 5, 3, 3);
+      g.fillRect(12, 5, 3, 3);
+      // Visor cian característico
+      g.fillStyle(0x98e8ff, 0.9);
+      g.fillRect(6, 9, 7, 2);
+      g.generateTexture(key, 18, 16);
+      g.destroy();
+    },
 
-      // Herramientas / Armas (misma capa que el diseño original)
-      if (layers.tool === "pickaxe") {
-        g.lineStyle(3, 0x5a3328, 1);
-        g.beginPath(); g.moveTo(24, 20); g.lineTo(36, 8); g.strokePath();
-        g.lineStyle(2, 0xc9d7df, 1);
-        g.beginPath(); g.moveTo(28, 6); g.lineTo(40, 14); g.strokePath();
-      }
-
-      const textureWidth = layers.tool ? 42 : 32;
-      g.generateTexture(key, textureWidth, 46);
+    // Miembro genérico alargado y redondeado (6x14). Sirve tanto para brazos como
+    // para piernas. El parámetro `color` (opcional) permite crear una variante
+    // "trasera" con gris muy sutil; si no se pasa, queda blanco para poder
+    // tintearse en juego.js con setTint().
+    makePlayerLimb: function(scene, key = "player-limb", color = 0xf7fbff) {
+      const g = scene.make.graphics({ x: 0, y: 0, add: false });
+      g.fillStyle(color, 1);
+      g.fillRoundedRect(0, 0, 6, 14, 3);
+      g.lineStyle(1, 0x8ba0ad, 0.45);
+      g.strokeRoundedRect(1, 1, 4, 12, 2);
+      g.generateTexture(key, 6, 14);
       g.destroy();
     },
 
