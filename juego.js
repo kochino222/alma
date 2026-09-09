@@ -2634,11 +2634,11 @@
         } else if (!onGround || !controls.axis) this.walkDustTimer = 85;
       }
 
-      // Animación procedural del jugador (ETAPA 3 — Rig Paper-Doll).
-      // Anima el contenedor this.playerRig y sus piezas (this.rigParts) con
-      // trigonometría pura: NO usa setTexture. Solo visual: no toca físicas ni
-      // colisiones (esas viven en handleMovement()). La escala X del contenedor
-      // hace el volteo (flip) según this.player.facing.
+      // ══════════════════════════════════════════════════════════════════════════
+      // ANIMACIÓN PROCEDURAL PULIDA (Paper-Doll Rig) — Optimizada para Game Feel
+      // ══════════════════════════════════════════════════════════════════════════
+      // Trigonometría pura para animar this.playerRig y this.rigParts.
+      // NO toca físicas ni colisiones (solo visual). El flip se hace con scaleX.
       updatePlayerAnimation(time) {
         if (!this.player?.body || !this.playerRig || !this.rigParts) return;
 
@@ -2690,8 +2690,8 @@
         const dt = Phaser.Math.Clamp(time - R.lastTime, 1, 50);
         R.lastTime = time;
 
-        // Respuesta rápida, pero nunca instantánea.
-        const lerp = 1 - Math.exp(-dt / 70);
+        // ✨ OPTIMIZADO: Lerp más responsivo (45ms → transición sedosa, no resbaladiza).
+        const lerp = 1 - Math.exp(-dt / 45);
 
         // ============================================================
         // 5. Defaults / objetivo de pose
@@ -2760,7 +2760,7 @@
           const fallReference = 620;
 
           // ----------------------------------------------------------
-          // SUBIENDO
+          // SUBIENDO (vy < -10)
           // ----------------------------------------------------------
           if (vy < -10) {
             const rise = Phaser.Math.Clamp(
@@ -2769,47 +2769,54 @@
               1
             );
 
-            // Pose base + variación proporcional a la velocidad.
-            targetTorsoAngle = Phaser.Math.Linear(7, 13, rise);
-            targetHeadAngle = Phaser.Math.Linear(4, 10, rise);
+            // ✨ PULIDO: Inclinación más enérgica (+2°) para sensación de impulso.
+            targetTorsoAngle = Phaser.Math.Linear(8, 15, rise);
+            targetHeadAngle = Phaser.Math.Linear(5, 12, rise);
 
-            // Brazo frontal "buscando" arriba.
-            targetFrontArm = Phaser.Math.Linear(-115, -158, rise);
+            // ✨ Brazo frontal más dramático (alcanza -165° en pico).
+            targetFrontArm = Phaser.Math.Linear(-120, -165, rise);
 
             // Brazo trasero compensa.
-            targetBackArm = Phaser.Math.Linear(10, 26, rise);
+            targetBackArm = Phaser.Math.Linear(12, 30, rise);
 
-            // Piernas asimétricas: una recogida y otra extendida.
-            targetFrontLeg = Phaser.Math.Linear(-24, -48, rise);
-            targetBackLeg = Phaser.Math.Linear(5, 15, rise);
+            // ✨ Piernas: asimetría más marcada para energía dinámica.
+            targetFrontLeg = Phaser.Math.Linear(-28, -54, rise);
+            targetBackLeg = Phaser.Math.Linear(8, 20, rise);
 
-            targetTorsoY = this.rigTorsoBaseY - Phaser.Math.Linear(0, 1.5, rise);
-            targetHeadY = this.rigHeadBaseY - Phaser.Math.Linear(0, 1.0, rise);
+            targetTorsoY = this.rigTorsoBaseY - Phaser.Math.Linear(0, 2.0, rise);
+            targetHeadY = this.rigHeadBaseY - Phaser.Math.Linear(0, 1.4, rise);
 
-            targetTorsoScaleY = Phaser.Math.Linear(1, 0.95, rise);
+            // ✨ Squash más sutil para evitar deformación excesiva.
+            targetTorsoScaleY = Phaser.Math.Linear(1, 0.96, rise);
           }
 
           // ----------------------------------------------------------
-          // APEX
+          // ✨ ÁPICE MEJORADO: Momento zen suspendido (vy entre -20 y +20)
           // ----------------------------------------------------------
-          else if (Math.abs(vy) <= 10) {
-            targetTorsoAngle = 6;
-            targetHeadAngle = 4;
+          else if (Math.abs(vy) <= 20) {
+            // Micro-transición dentro del ápice (cuanto más cerca de 0, más suspendido).
+            const apexBlend = 1 - Math.abs(vy) / 20;
 
-            targetFrontArm = -145;
-            targetBackArm = 18;
+            // Brazos flotantes simétricos.
+            targetFrontArm = Phaser.Math.Linear(-118, -135, apexBlend);
+            targetBackArm = Phaser.Math.Linear(-112, -128, apexBlend);
 
-            targetFrontLeg = -34;
-            targetBackLeg = 8;
+            // Piernas compactas pero no idénticas.
+            targetFrontLeg = Phaser.Math.Linear(-10, -18, apexBlend);
+            targetBackLeg = Phaser.Math.Linear(6, 12, apexBlend);
 
-            targetTorsoY = this.rigTorsoBaseY - 1;
-            targetHeadY = this.rigHeadBaseY - 0.5;
+            // Torso casi neutral = suspensión.
+            targetTorsoAngle = Phaser.Math.Linear(4, 1, apexBlend);
+            targetHeadAngle = Phaser.Math.Linear(2, 0, apexBlend);
 
-            targetTorsoScaleY = 0.97;
+            targetTorsoY = this.rigTorsoBaseY - Phaser.Math.Linear(0.5, 1.2, apexBlend);
+            targetHeadY = this.rigHeadBaseY - Phaser.Math.Linear(0.3, 0.8, apexBlend);
+
+            targetTorsoScaleY = Phaser.Math.Linear(0.99, 0.975, apexBlend);
           }
 
           // ----------------------------------------------------------
-          // CAÍDA
+          // CAYENDO (vy > 20)
           // ----------------------------------------------------------
           else {
             const fall = Phaser.Math.Clamp(
@@ -2818,80 +2825,83 @@
               1
             );
 
-            // El torso se estabiliza progresivamente.
-            targetTorsoAngle = Phaser.Math.Linear(3, -2, fall);
-            targetHeadAngle = Phaser.Math.Linear(2, -4, fall);
+            // ✨ Torso se inclina hacia atrás progresivamente (-4° en caída máxima).
+            targetTorsoAngle = Phaser.Math.Linear(2, -4, fall);
+            targetHeadAngle = Phaser.Math.Linear(1, -6, fall);
 
-            // Brazos elevados por resistencia del aire.
-            targetFrontArm = Phaser.Math.Linear(-115, -145, fall);
-            targetBackArm = Phaser.Math.Linear(-100, -140, fall);
+            // ✨ Brazos: resistencia al aire (más elevados = -152°).
+            targetFrontArm = Phaser.Math.Linear(-110, -152, fall);
+            targetBackArm = Phaser.Math.Linear(-95, -148, fall);
 
-            // Piernas cada vez más rectas.
-            targetFrontLeg = Phaser.Math.Linear(-18, 0, fall);
-            targetBackLeg = Phaser.Math.Linear(12, 0, fall);
+            // ✨ Piernas: extensión asimétrica (no idénticas).
+            targetFrontLeg = Phaser.Math.Linear(-12, 5, fall);
+            targetBackLeg = Phaser.Math.Linear(8, -3, fall);
 
-            targetTorsoY = this.rigTorsoBaseY + Phaser.Math.Linear(0, 1.5, fall);
-            targetHeadY = this.rigHeadBaseY + Phaser.Math.Linear(0, 1, fall);
+            targetTorsoY = this.rigTorsoBaseY + Phaser.Math.Linear(0, 2.2, fall);
+            targetHeadY = this.rigHeadBaseY + Phaser.Math.Linear(0, 1.5, fall);
 
-            targetTorsoScaleY = Phaser.Math.Linear(0.98, 1, fall);
+            // ✨ Stretch muy sutil en caída máxima.
+            targetTorsoScaleY = Phaser.Math.Linear(0.98, 1.02, fall);
           }
         }
         // ------------------------------------------------------------
         // RUN
         // ------------------------------------------------------------
         else if (speedX > 15) {
-          // Frecuencia proporcional a la velocidad horizontal.
-          // 15 px/s => lento, 300 px/s => ciclo rápido.
           const speed01 = Phaser.Math.Clamp(speedX / 300, 0, 1);
 
-          const frequency = Phaser.Math.Linear(0.010, 0.020, speed01);
+          // ✨ PULIDO: Frecuencia más rápida (0.012 → 0.025) para carrera enérgica.
+          const frequency = Phaser.Math.Linear(0.012, 0.025, speed01);
           const phase = time * frequency;
 
           const legWave = Math.sin(phase);
           const armWave = Math.sin(phase + Math.PI);
 
-          // Péndulo opuesto entre piernas.
-          targetFrontLeg = legWave * 45;
-          targetBackLeg = -legWave * 45;
+          // ✨ Amplitud de piernas aumentada (45° → 52°) para zancadas más largas.
+          targetFrontLeg = legWave * 52;
+          targetBackLeg = -legWave * 52;
 
-          // Brazos contrabalanceando las piernas.
-          targetFrontArm = armWave * 34;
-          targetBackArm = -armWave * 34;
+          // ✨ Brazos: amplitud aumentada (34° → 42°) para contrabalanceo visible.
+          targetFrontArm = armWave * 42;
+          targetBackArm = -armWave * 42;
 
-          // Pequeña inclinación según velocidad para dar sensación de impulso.
-          targetTorsoAngle = Phaser.Math.Linear(2, 7, speed01);
-          targetHeadAngle = Phaser.Math.Linear(0, 4, speed01);
+          // ✨ Inclinación hacia delante más pronunciada (7° → 10° a velocidad max).
+          targetTorsoAngle = Phaser.Math.Linear(3, 10, speed01);
+          targetHeadAngle = Phaser.Math.Linear(1, 6, speed01);
 
-          // El "peso" cae en cada pisada.
-          const footImpact = Math.abs(Math.cos(phase));
-          const bob = footImpact * Phaser.Math.Linear(0.8, 2.8, speed01);
+          // ✨ TORSO BOBBING MEJORADO: peso realista en cada pisada.
+          // Usamos sin² (footImpact²) para acelerar el "golpe" del pie.
+          const footImpact = Math.abs(Math.sin(phase));
+          const impactSquared = footImpact * footImpact;
+          const bob = impactSquared * Phaser.Math.Linear(1.2, 3.8, speed01);
 
           targetTorsoY = this.rigTorsoBaseY + bob;
-          targetHeadY = this.rigHeadBaseY + bob * 0.85;
+          targetHeadY = this.rigHeadBaseY + bob * 0.75;
 
-          // Compresión mínima del torso al impactar.
-          targetTorsoScaleY = 1 - footImpact * Phaser.Math.Linear(0.012, 0.035, speed01);
+          // ✨ Squash & Stretch: compresión más visible (0.035 → 0.055).
+          targetTorsoScaleY = 1 - impactSquared * Phaser.Math.Linear(0.020, 0.055, speed01);
         }
 
         // ------------------------------------------------------------
-        // IDLE
+        // IDLE (Respiración)
         // ------------------------------------------------------------
         else {
-          // Respiración lenta, asimétrica y continua.
-          const breath = Math.sin(time * 0.0026);
-          const breathSoft = Math.sin(time * 0.0026 + 0.35);
+          // ✨ PULIDO: Respiración más lenta (0.0026 → 0.0020) y asimétrica.
+          const breath = Math.sin(time * 0.0020);
+          const breathSoft = Math.sin(time * 0.0020 + 0.6);
 
-          targetTorsoAngle = breath * 1.2;
-          targetHeadAngle = breathSoft * 0.8;
+          // ✨ Amplitud reducida (1.2° → 0.7°) para respiración sutil, no mareante.
+          targetTorsoAngle = breath * 0.7;
+          targetHeadAngle = breathSoft * 0.5;
 
-          // Respiración principalmente vertical.
-          targetTorsoScaleY = 1 + breath * 0.035;
+          // ✨ ScaleY más sutil (0.035 → 0.022) para evitar "inflar" demasiado.
+          targetTorsoScaleY = 1 + breath * 0.022;
 
-          // La cabeza acompaña, pero con menor amplitud.
-          targetTorsoY = this.rigTorsoBaseY - breath * 0.35;
-          targetHeadY = this.rigHeadBaseY - breath * 0.55;
+          // ✨ Movimiento vertical reducido para respiración orgánica, no flotante.
+          targetTorsoY = this.rigTorsoBaseY - breath * 0.25;
+          targetHeadY = this.rigHeadBaseY - breath * 0.40;
 
-          // Extremidades vuelven lentamente a neutral.
+          // Extremidades en reposo.
           targetFrontLeg = 0;
           targetBackLeg = 0;
           targetFrontArm = 0;
