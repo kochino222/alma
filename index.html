@@ -17,10 +17,9 @@
   <!-- Script de Phaser -->
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
   
-  <!-- Enlazamos el módulo de arte ANTES de la lógica -->
-  <script src="art_data.js"></script>
-
-  <!-- Enlazamos la lógica principal -->
-  <script src="juego.js"></script>
+  <!-- Fase 1 del refactor: art_data.js y juego.js son ahora módulos ES (ver hermes/plan-refactor.md).
+       art_data.js ya NO se enlaza acá: juego.js lo importa, y un módulo no puede
+       cargarse como script clásico (tiene "export"). Phaser sí sigue siendo clásico. -->
+  <script type="module" src="juego.js"></script>
 </body>
 </html>

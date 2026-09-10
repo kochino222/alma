@@ -1,4 +1,4 @@
-window.ArtData = (() => {
+export const ArtData = (() => {
   "use strict";
 
   return {
@@ -381,3 +381,7 @@ window.ArtData = (() => {
     }
   };
 })();
+
+// Puente temporal de compatibilidad. Se elimina en la Fase 2,
+// cuando juego.js importe ArtData directo en vez de leer window.ArtData.
+window.ArtData = ArtData;

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Verificacion - Alma en Blanco</title>
+  <link rel="stylesheet" href="../estilos.css">
+  <script>
+    window.__errs = [];
+    window.addEventListener("error", e => window.__errs.push("ERROR: " + (e.message || e.type) + " @" + (e.filename || "") + ":" + (e.lineno || "")));
+    window.addEventListener("unhandledrejection", e => window.__errs.push("REJECTION: " + e.reason));
+  </script>
+</head>
+<body>
+  <div id="game-root">
+    <div class="fallback">Preparando el descenso...</div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+  <script type="module" src="../juego.js"></script>
+
+  <script>
+    // Reporte automatico de estado. Pensado para leerse con:
+    //   chrome --headless=new --virtual-time-budget=20000 --dump-dom http://127.0.0.1:8123/hermes/verificar.html
+    // o simplemente abriendo esta pagina a mano y mirando el bloque "verificacion".
+    window.addEventListener("load", () => setTimeout(() => {
+      var out;
+      try {
+        var g = window.__BLANK_SOUL_GAME__;
+        out = {
+          phaserVersion: window.Phaser ? window.Phaser.VERSION : "AUSENTE",
+          artDataGlobal: !!window.ArtData,
+          instanciaJuego: !!g,
+          escenasActivas: g && g.scene ? g.scene.getScenes(true).map(s => s.scene.key) : null,
+          totalEscenas: g && g.scene ? g.scene.scenes.length : null,
+          texturasCargadas: g && g.textures ? g.textures.getTextureKeys().length : null,
+          canvas: !!document.querySelector("canvas"),
+          canvasSize: (function () { var c = document.querySelector("canvas"); return c ? c.width + "x" + c.height : null; })(),
+          fallbackTexto: (document.querySelector(".fallback") || {}).textContent,
+          selfTestDisponible: typeof window.__BLANK_SOUL_SELF_TEST__,
+          selfTest: typeof window.__BLANK_SOUL_SELF_TEST__ === "function" ? window.__BLANK_SOUL_SELF_TEST__() : "AUSENTE",
+          configGlobal: !!window.__BLANK_SOUL_CONFIG__,
+          errores: window.__errs
+        };
+      } catch (e) {
+        out = { excepcion: String(e), errores: window.__errs };
+      }
+      var pre = document.createElement("pre");
+      pre.id = "verificacion";
+      pre.textContent = JSON.stringify(out, null, 1);
+      document.body.appendChild(pre);
+      document.title = out.errores && out.errores.length
+        ? "FALLO - " + out.errores.length + " errores"
+        : (out.selfTest && out.selfTest.ok === false ? "FALLO - selfTest" : "OK");
+    }, 3000));
+  </script>
+</body>
+</html>

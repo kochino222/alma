@@ -1,9 +1,24 @@
- (() => {
-    "use strict";
+// Alma en Blanco - modulo principal.
+// Fase 1 del refactor a ES Modules (ver hermes/plan-refactor.md).
+//
+// El IIFE que envolvia TODO este archivo fue reemplazado por el scope de modulo:
+// mismo aislamiento (nada es global salvo lo que se asigna explicitamente a window),
+// pero ahora los bloques se pueden exportar e importar. Es la base de la Fase 2.
+//
+// Notas de esta fase:
+//   - Se quito "use strict": los modulos ES ya son estrictos por definicion.
+//   - La indentacion de 4 espacios se conserva a proposito, para que este commit
+//     tenga el diff minimo posible. Se normaliza en la Fase 2, al mover cada bloque.
+//   - Se agrego el export final; todavia nada lo importa. Es intencional.
+//
+// Requiere servidor HTTP (no abrir con file://): los modulos no cargan por CORS.
+//   python -m http.server 8123   ->   http://localhost:8123
+
+import "./art_data.js";
 
     if (!window.Phaser) {
       document.querySelector(".fallback").textContent = "No se pudo cargar Phaser. Revisá la conexión a Internet y recargá la página.";
-      return;
+      throw new Error("[Alma] Phaser no está disponible: no se puede iniciar el juego.");
     }
 
     const VIEW_W = 960;
@@ -4780,4 +4795,22 @@ class PauseScene extends Phaser.Scene {
       window.__BLANK_SOUL_GAME__ = new Phaser.Game(config);
       installNativeTouchGuards(window.__BLANK_SOUL_GAME__);
     });
-  })();
+
+
+// ===== Exports (Fase 1) =====
+// Exponen los bloques que la Fase 2 va a extraer a archivos propios.
+// Todavia nada los importa; es intencional y no cambia el comportamiento.
+export {
+  VIEW_W, VIEW_H, TILE, BASE_GRAVITY, JUMP_SPEED, SACRIFICE_JUMP_SPEED,
+  ROUTE_MAIN, ROUTE_DRAMATIC, TOTAL_STAGES, MAX_LAW_TIER,
+  SAVE_KEY, RUN_FRAGMENT_KEY, LEVELS, LAW_DEFS, DEFAULT_META,
+  screenW, screenH, hashSeed, mulberry32, randInt, choice,
+  toSaveShape, fromSaveShape, loadMeta, saveMeta, normalizeMeta,
+  gravityMultiplier, trapMultiplier, economyMultiplier, inflationMultiplier,
+  inflatedPrice, daggerReward, lawUnlocked, lawActive,
+  runFragmentBank, setRunFragmentBank, resetRunFragmentBank, newRunId,
+  effectiveCoinBurden, playerMoveSpeed, rectsOverlap, makeRect,
+  AudioEngine, AUDIO, BootScene, MenuScene, ProceduralMap, SymbolicEntity,
+  ControlRig, GameScene, AstralScene, PauseScene,
+  installSelfTests, installNativeTouchGuards, config
+};
