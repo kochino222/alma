@@ -153,9 +153,28 @@
         touchAction: 'manipulation',
         lineHeight: '1.2',
       },
-      onClick: onBadgeTap,
-      onTouchEnd: onBadgeTap,
     }, [`v${getShortCommit()} ${getBranch()}`]);
+
+    // Long press / hold to open panel (500ms)
+    let pressTimer = null;
+    const startPress = (e) => {
+      e.preventDefault();
+      pressTimer = setTimeout(() => {
+        pressTimer = null;
+        togglePanel();
+      }, 500);
+    };
+    const endPress = () => {
+      if (pressTimer) clearTimeout(pressTimer);
+      pressTimer = null;
+    };
+
+    badge.addEventListener('mousedown', startPress);
+    badge.addEventListener('mouseup', endPress);
+    badge.addEventListener('mouseleave', endPress);
+    badge.addEventListener('touchstart', startPress, { passive: false });
+    badge.addEventListener('touchend', endPress);
+    badge.addEventListener('touchcancel', endPress);
 
     document.body.appendChild(badge);
     state.elements.badge = badge;
@@ -170,22 +189,6 @@
   function getBranch() {
     const meta = document.querySelector('meta[name="build-branch"]');
     return meta?.content || 'unknown';
-  }
-
-  function onBadgeTap(e) {
-    e.preventDefault();
-    const now = Date.now();
-    if (now - state.lastTap < 2000) {
-      state.taps++;
-    } else {
-      state.taps = 1;
-    }
-    state.lastTap = now;
-
-    if (state.taps >= 10) {
-      state.taps = 0;
-      togglePanel();
-    }
   }
 
   function createPanel() {

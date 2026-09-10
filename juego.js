@@ -1818,7 +1818,7 @@ import "./art_data.js";
         this.controls = new ControlRig(this);
         this.setupCollisions();
         this.cameras.main.setBounds(0, 0, this.generated.cols * TILE, this.generated.rows * TILE);
-        this.cameras.main.startFollow(this.player, true, 0.15, 0.12);
+        this.cameras.main.startFollow(this.player, true, 0.2, 0.15);
         this.configureCamera();
         this.scale.on("resize", this.configureCamera, this);
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scale.off("resize", this.configureCamera, this));
@@ -1834,7 +1834,7 @@ import "./art_data.js";
               const sw = screenW(this);
               const sh = screenH(this);
               const portrait = sh > sw;
-              this.cameras.main.deadzone = new Phaser.Geom.Rectangle(0, 0, Math.min(110, sw * 0.23), portrait ? 80 : 70);
+              this.cameras.main.deadzone = new Phaser.Geom.Rectangle(0, 0, Math.min(120, sw * 0.25), portrait ? 100 : 80);
               this.cameras.main.setFollowOffset(0, portrait ? -40 : -30);
               // Keep the existing scroll on rotation; following converges without recentering.
               this.cameraPortrait = portrait;
