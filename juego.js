@@ -2463,50 +2463,65 @@ import "./art_data.js";
       }
 
       update(time, delta) {
-        if (this.ending) return;
-        const dt = Math.min(delta, 40);
-        const settle = Math.max(0, this.cameraSettleMs || 0) * 400 / 700;
-        this.cameraSettleMs = Math.max(0, (this.cameraSettleMs || 0) - dt);
-        this.cameras.main.setLerp(1 - Math.exp(-dt / (150 + settle)), 1 - Math.exp(-dt / ((this.cameraPortrait ? 260 : 170) + settle)));
-        this.nearExit = false;
-        this.nearAltar = null;
-        this.nearGod = false;
-        this.resolveSlope();
-        const controls = this.controls.read();
-        if (controls.bombPressed) this.deployBomb(time);
-        this.updateProximity();
-        if (!this.certaintyAnchor && (this.inverted || time < this.doubtUntil)) controls.axis *= -1;
-        if (time < this.staggerUntil) {
-          controls.axis = 0;
-          controls.jumpPressed = false;
-          controls.up = controls.down = false;
-        }
-        this.handleLadders(controls);
-        this.handleMovement(controls, time, dt);
-        this.updatePlayerAnimation(time);
-        if (this.ending) return;
-        this.updateHandsRig?.(controls, time, dt);
-        if (this.ending) return;
-        for (const entity of this.symbolicEntities || []) {
-          if (this.ending) return;
-          entity.update(time, dt);
-          if (this.ending) return;
-        }
-        this.updateSymbolicAttacks(time, dt);
-        if (this.ending) return;
-        this.updateProximity();
-        this.handleInteractions(controls, time);
-        if (this.ending) return;
-        this.updateWorldDynamics(time, dt);
-        if (this.ending) return;
-        this.updateCaveSafeguards?.(controls, time, dt);
-        if (this.ending) return;
-        this.updateHud(time, dt);
-        this.updateLighting(time);
-        if (this.ending) return;
-        this.checkDeathPlane();
-        if (this.ending) return;
-      }
+              if (this.ending) return;
+              const dt = Math.min(delta, 40);
+              const settle = Math.max(0, this.cameraSettleMs || 0) * 400 / 700;
+              this.cameraSettleMs = Math.max(0, (this.cameraSettleMs || 0) - dt);
+              // Dynamic lerp removed — using fixed values from startFollow (0.2, 0.15)
+              // this.cameras.main.setLerp(1 - Math.exp(-dt / (150 + settle)), 1 - Math.exp(-dt / ((this.cameraPortrait ? 260 : 170) + settle)));
+              this.nearExit = false;
+              this.nearAltar = null;
+              this.nearGod = false;
+              this.resolveSlope();
+              const controls = this.controls.read();
+              if (controls.bombPressed) this.deployBomb(time);
+              this.updateProximity();
+              if (!this.certaintyAnchor && (this.inverted || time < this.doubtUntil)) controls.axis *= -1;
+              if (time < this.staggerUntil) {
+                controls.axis = 0;
+                controls.jumpPressed = false;
+                controls.up = controls.down = false;
+              }
+              this.handleLadders(controls);
+              this.handleMovement(controls, time, dt);
+              this.updatePlayerAnimation(time);
+              if (this.ending) return;
+              this.updateHandsRig?.(controls, time, dt);
+              if (this.ending) return;
+              for (const entity of this.symbolicEntities || []) {
+                if (this.ending) return;
+                entity.update(time, dt);
+                if (this.ending) return;
+              }
+              this.updateSymbolicAttacks(time, dt);
+              if (this.ending) return;
+              this.updateProximity();
+              this.handleInteractions(controls, time);
+              if (this.ending) return;
+              this.updateWorldDynamics(time, dt);
+              if (this.ending) return;
+              this.updateCaveSafeguards?.(controls, time, dt);
+              if (this.ending) return;
+              this.updateHud(time, dt);
+              this.updateLighting(time);
+              if (this.ending) return;
+              this.checkDeathPlane();
+              if (this.ending) return;
+
+              // Camera jitter fix for roundPixels: snap scroll when player nearly stopped
+              const cam = this.cameras.main;
+              const vx = this.player?.body?.velocity?.x ?? 0;
+              const vy = this.player?.body?.velocity?.y ?? 0;
+              const speed = Math.hypot(vx, vy);
+              if (speed < 8) {
+                const targetX = this.player.x - cam.width / 2 + (cam.deadzone?.x ?? 0) + (cam.deadzone?.width ?? 0) / 2;
+                const targetY = this.player.y - cam.height / 2 + (cam.deadzone?.y ?? 0) + (cam.deadzone?.height ?? 0) / 2;
+                const dx = targetX - cam.scrollX;
+                const dy = targetY - cam.scrollY;
+                if (Math.abs(dx) < 0.5) cam.scrollX = Math.round(targetX);
+                if (Math.abs(dy) < 0.5) cam.scrollY = Math.round(targetY);
+              }
+            }
 
       handleMovement(controls, time, dt) {
         const body = this.player.body;
