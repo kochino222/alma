@@ -27,6 +27,7 @@
       certaintyAnchor: false,
       bottledPyre: false,
       amnesiaReady: false,
+      economyGraceLaw: false,
       doubleJumpLaw: false,
       willInertiaLaw: false,
       selectiveAmnesiaLaw: false,
@@ -88,12 +89,17 @@
     s.bottledPyre = p.bottledPyre;
     s.amnesiaReady = p.amnesiaReady;
 
-    // Leyes (meta)
+    // Leyes (meta) - estructura directa
     if (s.meta) {
-      s.meta.laws = s.meta.laws || {};
-      s.meta.laws.doubleJump = p.doubleJumpLaw;
-      s.meta.laws.willInertia = p.willInertiaLaw;
-      s.meta.laws.selectiveAmnesia = p.selectiveAmnesiaLaw;
+      s.meta.economyGrace = p.economyGraceLaw ? 1 : 0;
+      s.meta.willInertia = p.willInertiaLaw ? 1 : 0;
+      s.meta.doubleJump = p.doubleJumpLaw ? 1 : 0;
+      s.meta.selectiveAmnesia = p.selectiveAmnesiaLaw ? 1 : 0;
+      // active flags
+      s.meta.activeEconomyGrace = p.economyGraceLaw ? 1 : 0;
+      s.meta.activeWillInertia = p.willInertiaLaw ? 1 : 0;
+      s.meta.activeDoubleJump = p.doubleJumpLaw ? 1 : 0;
+      s.meta.activeSelectiveAmnesia = p.selectiveAmnesiaLaw ? 1 : 0;
     }
 
     // Actualizar HUD
@@ -117,10 +123,11 @@
     state.params.certaintyAnchor = s.certaintyAnchor;
     state.params.bottledPyre = s.bottledPyre;
     state.params.amnesiaReady = s.amnesiaReady;
-    if (s.meta?.laws) {
-      state.params.doubleJumpLaw = s.meta.laws.doubleJump;
-      state.params.willInertiaLaw = s.meta.laws.willInertia;
-      state.params.selectiveAmnesiaLaw = s.meta.laws.selectiveAmnesia;
+    if (s.meta) {
+      state.params.economyGraceLaw = !!s.meta.economyGrace;
+      state.params.doubleJumpLaw = !!s.meta.doubleJump;
+      state.params.willInertiaLaw = !!s.meta.willInertia;
+      state.params.selectiveAmnesiaLaw = !!s.meta.selectiveAmnesia;
     }
     syncUI();
   }
@@ -285,6 +292,7 @@
     addControl('Amnesia selectiva (ready)', 'checkbox', 'amnesiaReady');
 
     // Leyes
+    addControl('Ley: Aligerar Oro', 'checkbox', 'economyGraceLaw');
     addControl('Ley: Doble salto', 'checkbox', 'doubleJumpLaw');
     addControl('Ley: Inercia de voluntad', 'checkbox', 'willInertiaLaw');
     addControl('Ley: Amnesia selectiva', 'checkbox', 'selectiveAmnesiaLaw');
@@ -352,6 +360,7 @@
       certaintyAnchor: false,
       bottledPyre: false,
       amnesiaReady: false,
+      economyGraceLaw: false,
       doubleJumpLaw: false,
       willInertiaLaw: false,
       selectiveAmnesiaLaw: false,

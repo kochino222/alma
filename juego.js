@@ -240,8 +240,8 @@ import "./art_data.js";
     }
 
     function economyMultiplier(meta) {
-      return meta.economyGrace && lawActive(meta, "economyGrace") ? 0.72 : 1;
-    }
+          return meta?.economyGrace && lawActive(meta, "economyGrace") ? 0.72 : 1;
+        }
 
     function inflationMultiplier(worldNumber) {
       return [1, 1.4, 1.8, 2.2][clamp(Math.floor(worldNumber || 1), 1, 4) - 1];
