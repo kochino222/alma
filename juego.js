@@ -4788,13 +4788,19 @@ class PauseScene extends Phaser.Scene {
     };
 
     window.addEventListener("load", () => {
-      if (!window.Phaser) {
-        document.querySelector(".fallback").textContent = "No se pudo cargar Phaser. Revisá la conexión a Internet y recargá la página.";
-        return;
-      }
-      window.__BLANK_SOUL_GAME__ = new Phaser.Game(config);
-      installNativeTouchGuards(window.__BLANK_SOUL_GAME__);
-    });
+          if (!window.Phaser) {
+            document.querySelector(".fallback").textContent = "No se pudo cargar Phaser. Revisá la conexión a Internet y recargá la página.";
+            return;
+          }
+          window.__BLANK_SOUL_GAME__ = new Phaser.Game(config);
+          installNativeTouchGuards(window.__BLANK_SOUL_GAME__);
+
+          // DevPanel: se activa con localStorage.devMode = '1'
+          // 10 taps/clicks rápidos en el badge abre el panel.
+          if (localStorage.getItem("devMode") === "1") {
+            import("./devpanel.js").catch(() => {}); // carga perezosa, no rompe si falta
+          }
+        });
 
 
 // ===== Exports (Fase 1) =====
