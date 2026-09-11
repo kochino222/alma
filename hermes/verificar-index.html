@@ -1,0 +1,27 @@
+<!doctype html><html><head><meta charset="utf-8"></head><body>
+<div id="game-root"><div class="fallback">x</div></div>
+<script>
+window.__errs=[];
+window.addEventListener("error",e=>window.__errs.push("ERR:"+(e.message||e.type)+"@"+(e.filename||"")+":"+(e.lineno||"")));
+window.addEventListener("unhandledrejection",e=>window.__errs.push("REJ:"+e.reason));
+</script>
+<iframe id="f" src="../index.html" style="width:900px;height:600px"></iframe>
+<script>
+window.addEventListener("load",()=>setTimeout(()=>{
+  var fr=document.getElementById("f");
+  var out={};
+  try{
+    var w=fr.contentWindow;
+    out.errores=w.__errs||[];
+    var g=w.__BLANK_SOUL_GAME__;
+    out.juego=!!g;
+    out.escenasActivas=g&&g.scene?g.scene.getScenes(true).map(s=>s.scene.key):null;
+    out.totalEscenas=g&&g.scene?g.scene.scenes.length:null;
+    out.texturas=g&&g.textures?g.textures.getTextureKeys().length:null;
+    out.canvas=!!w.document.querySelector("canvas");
+    out.selfTest=typeof w.__BLANK_SOUL_SELF_TEST__==="function"?w.__BLANK_SOUL_SELF_TEST__().ok:"AUSENTE";
+  }catch(e){out.excepcion=String(e);}
+  var pre=document.createElement("pre");pre.id="verificacion";pre.textContent=JSON.stringify(out,null,1);
+  document.body.appendChild(pre);
+},6000));
+</script></body></html>

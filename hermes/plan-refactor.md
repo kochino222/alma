@@ -1,49 +1,63 @@
 # Plan de refactor — Alma en Blanco
 
 > Documento vivo. Escrito por Herminia (asistente de Santiago) para que el plan **no dependa de una conversación**.
-> **Fases 0 y 1 completadas** — rama `mejoras-graficas`, tag de seguridad `pre-refactor-2026-09-09`.
+> **Fases 0, 1 y 2 completadas** — rama `fix-camara-idle`, tag de seguridad `pre-refactor-2026-09-09`.
 
 ---
 
 ## 1. Objetivo
 
-Diseccionar `juego.js` — originalmente un monolito de **4782 líneas / 227 KB** — en archivos con responsabilidad única, **sin romper el juego**.
+Diseccionar `juego.js` — originalmente un monolito de **4837 líneas / 231 KB** — en archivos con responsabilidad única, **sin romper el juego**.
 
 Es un refactor de *estructura*, no de *comportamiento*. Al terminar, el juego debe verse y comportarse **exactamente igual**.
 
 ---
 
-## 2. Estado actual (post-Fase 1)
+## 2. Estado actual (post-Fase 2)
 
 | Archivo | Líneas | Rol |
 |---|---|---|
-| `index.html` | 24 | Carga Phaser 3.80.1 (CDN) + un solo `<script type="module">` |
-| `juego.js` | **4816** | Módulo ES. Todo el juego, ya sin IIFE |
+| `index.html` | 25 | Carga Phaser 3.80.1 (CDN) + un solo `<script type="module">` |
+| `juego.js` | **102** | Punto de entrada: imports + `config` + arranque. Sin lógica de juego |
 | `art_data.js` | 387 | Módulo ES. `export const ArtData` + puente `window.ArtData` |
-| `hermes/verificar.html` | — | Verificador automático de estado (ver §6) |
+| `src/` | 4828 | 14 módulos con responsabilidad única (ver abajo) |
+| `devpanel.js` | 399 | Panel de desarrollo (long-press 500ms en el badge de versión) |
+| `hermes/verificar.html` | — | Verificador automático: Phaser, escenas, texturas, self-test 48 mapas |
+| `hermes/verificar-gamescene.html` | — | Verificador de `GameScene`: 25 checks de sistemas, física y cruces entre módulos |
 | `hermes/plan-refactor.md` | — | Este documento |
 
-`juego.js` sigue teniendo el mismo código que antes: **el +34 de líneas son la cabecera, el bloque de exports y comentarios**. Ningún bloque fue movido todavía.
+### Mapa de `src/` (líneas reales)
 
-### Mapa de bloques (líneas reales, sin cambios desde el inicio)
-
-| Líneas | Bloque | Tamaño |
+| Ruta | Líneas | Rol |
 |---|---|---|
-| 1–302 | Cabecera de módulo + constantes + ~40 helpers (`TILE`, `LEVELS`, `LAW_DEFS`, `loadMeta`, `rectsOverlap`…) | 302 |
-| 303–426 | `AudioEngine` | 124 |
-| 428–448 | `BootScene` | 21 |
-| 449–598 | `MenuScene` | 150 |
-| 599–1080 | `ProceduralMap` | 482 |
-| 1081–1414 | `SymbolicEntity` | 334 |
-| 1415–1696 | `ControlRig` | 282 |
-| **1697–4362** | **`GameScene`** — **79 métodos** | **2666 (55%)** |
-| 4364–4577 | `AstralScene` | 214 |
-| 4579–4690 | `PauseScene` | 112 |
-| 4691–4746 | `installSelfTests` + `installNativeTouchGuards` | 56 |
-| 4747–4793 | `config` + arranque del juego | 47 |
-| 4795–4816 | Bloque de `export` | 22 |
+| `src/core/constantes.js` | 110 | `VIEW_W/H`, `TILE`, `LEVELS`, `LAW_DEFS`, `DEFAULT_META`, `SAVE_KEY`… |
+| `src/core/utils.js` | 52 | `clamp`, `Between`, `screenW/H`, `hashSeed`, `mulberry32`, `rectsOverlap`… |
+| `src/core/guardado.js` | 131 | Save/load Base64, `normalizeMeta`, leyes, inflación, banco de fragmentos |
+| `src/audio/AudioEngine.js` | 128 | `class AudioEngine` **+ singleton `AUDIO`** |
+| `src/escenas/BootScene.js` | 23 | Genera texturas y arranca el menú |
+| `src/escenas/MenuScene.js` | 156 | Menú principal |
+| `src/escenas/GameScene.js` | **2702** | Escena de juego (los 79 métodos, todavía sin partir) |
+| `src/escenas/AstralScene.js` | 221 | Meta-progreso / negociación de leyes |
+| `src/escenas/PauseScene.js` | 117 | Pausa + copia de semilla |
+| `src/mundo/ProceduralMap.js` | 487 | Generador procedural + su `selfTest()` |
+| `src/entidades/SymbolicEntity.js` | 339 | Los 8 enemigos simbólicos |
+| `src/controles/ControlRig.js` | 287 | Teclado + táctil multitáctil |
+| `src/controles/touchGuards.js` | 16 | Bloqueo de gestos nativos del canvas |
+| `src/sistemas/selfTests.js` | 59 | `installSelfTests`, `installNativeTouchGuards` |
 
-**El diagnóstico real:** las 9 clases chicas están bien separadas por responsabilidad. El problema no es el reparto de clases — **el problema es `GameScene`**, que concentra el 55% del archivo en 79 métodos. Ese es el objetivo de la Fase 3.
+### Tres ajustes obligatorios que se aplicaron (dependencias cruzadas)
+
+1. **`AUDIO` singleton**: no alcanzaba con exportar la clase — medio juego usa `AUDIO.jump()`, `AUDIO.unlock()`. `AudioEngine.js` exporta **clase + instancia**.
+2. **`touchGuards` antes que las escenas**: `BootScene.create()` y `ControlRig` llaman a `installNativeTouchGuards` desde el primer frame. Se extrajo como módulo propio **antes** de las escenas, no al final.
+3. **`playerMoveSpeed` en `guardado.js`**: `SymbolicEntity` lo usa (`updateBias`), así que quedó exportado desde el módulo de economía, no en `utils.js`.
+
+### Trampas encontradas al extraer (documentadas para la Fase 3)
+
+| Trampa | Qué pasó | Regla |
+|---|---|---|
+| **Phaser no es un módulo** | `import { Clamp } from "phaser"` falla: Phaser se carga como script clásico (global), no hay import map | Usar `Phaser.Math.Clamp` directo en `utils.js` |
+| **Orden de `const` al mover código** | En `ProceduralMap.addDramaticRoutes()` se movió `const id` **debajo** de su primer uso → `ReferenceError: Cannot access 'id' before initialization` | Al cortar/pegar, verificar que toda `const` quede **antes** de usarse (TDZ) |
+| **Imports olvidados** | `PauseScene` usaba `screenH` sin importarlo | Tras cada extracción, correr el chequeo de símbolos (ver §5) |
 
 ---
 
@@ -97,24 +111,26 @@ Principio rector: **una fase = un commit = un estado jugable verificable**.
 
 **Segundo desvío:** se conservó la indentación de 4 espacios original para que el diff sea mínimo y revisable. Se normaliza en la Fase 2, al mover cada bloque a su archivo.
 
-### ⬜ Fase 2 — Extraer los bloques fáciles (PENDIENTE)
+### ✅ Fase 2 — Extraer los bloques fáciles (COMPLETADA)
 
-Un commit por archivo, verificando en cada uno. Orden propuesto:
+Un commit por bloque lógico, verificando en cada paso. Orden ejecutado:
 
-1. `src/core/constantes.js` — `VIEW_W`, `TILE`, `LEVELS`, `LAW_DEFS`, `SAVE_KEY`…
-2. `src/core/utils.js` — `hashSeed`, `mulberry32`, `rectsOverlap`, `makeRect`, multiplicadores…
-3. `src/core/guardado.js` — `loadMeta`, `saveMeta`, `toSaveShape`, `fromSaveShape`, `normalizeMeta`…
-4. `src/audio/AudioEngine.js`
-5. `src/escenas/` → `BootScene.js`, `MenuScene.js`, `PauseScene.js`, `AstralScene.js`
-6. `src/mundo/ProceduralMap.js`
-7. `src/entidades/SymbolicEntity.js`
-8. `src/controles/ControlRig.js`
-9. `src/sistemas/selfTests.js` + `touchGuards.js`
-10. Reemplazar el puente `window.ArtData` por un `import { ArtData }` real.
+1. `src/core/constantes.js` ✅
+2. `src/core/utils.js` ✅
+3. `src/core/guardado.js` ✅
+4. `src/audio/AudioEngine.js` ✅ (+ singleton `AUDIO`)
+5. `src/controles/touchGuards.js` ✅ (adelantado: lo necesita `BootScene`)
+6. `src/controles/ControlRig.js` ✅
+7. `src/escenas/BootScene.js`, `MenuScene.js`, `PauseScene.js`, `AstralScene.js` ✅
+8. `src/mundo/ProceduralMap.js` ✅
+9. `src/entidades/SymbolicEntity.js` ✅
+10. `src/sistemas/selfTests.js` ✅
+11. `src/escenas/GameScene.js` ✅ (bloque grande, se extrajo entero)
+12. Reescritura de `juego.js` como punto de entrada ✅
 
-Tras esta fase: `juego.js` baja a ~**2700 líneas** (sólo `GameScene` + arranque).
+**Resultado: `juego.js` pasó de 4837 → 102 líneas.**
 
-**Etapa delegable:** el corte mecánico de estos bloques **no necesita razonamiento caro** → conviene delegarlo a un subagente/modelo barato, con este documento como especificación.
+Pendiente de Fase 2 (cosmético): reemplazar el puente `window.ArtData` por un `import { ArtData }` real, y normalizar la indentación de 4 espacios a 2.
 
 ### ⬜ Fase 3 — Partir `GameScene` (PENDIENTE — el refactor de verdad)
 
@@ -136,6 +152,8 @@ Tras esta fase: `juego.js` baja a ~**2700 líneas** (sólo `GameScene` + arranqu
 Criterio de corte: **módulos que reciben `scene` como parámetro** (patrón "sistema"), en vez de herencia o mixins. Así cada pieza es testeable y no hay sorpresas de `this`.
 
 👉 `GameScene` final esperado: **~300–400 líneas**.
+
+> ⚠️ **Advertencia para la Fase 3**: es la fase más riesgosa. Cada sistema extraído debe correr `hermes/verificar-gamescene.html` (25 checks) antes de seguir. Un commit por sistema, nunca dos.
 
 ### ⬜ Fase 4 — Cierre
 - Actualizar `GDD.md` / `ART_BIBLE.md` con la nueva estructura.
