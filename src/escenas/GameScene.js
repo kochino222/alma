@@ -24,6 +24,7 @@ import * as Hud from "../sistemas/hud.js";
 import * as Altar from "../sistemas/altar.js";
 import * as Progresion from "../sistemas/progresion.js";
 import * as Combate from "../sistemas/combate.js";
+import * as MundoDinamica from "../sistemas/mundo-dinamica.js";
 const Between = Phaser.Math.Between;
 
 export class GameScene extends Phaser.Scene {
@@ -1475,213 +1476,27 @@ export class GameScene extends Phaser.Scene {
 
   sacrificeForRoute(route, useLife = false) { return Altar.sacrificeForRoute(this, route, useLife); }
 
-  deployBomb(time) {
-    if (this.ending) return;
-    if (this.bombs <= 0) {
-      this.showMessage("No quedan bombas.", 1200); AUDIO.reject(); return;
-    }
-    this.bombs -= 1;
-    const dir = this.player.facing || 1;
-    const bomb = this.bombsGroup.create(this.player.x + dir * 22, this.player.y - 4, "bomb");
-    bomb.body.setCircle(10, 2, 3).setMaxVelocity(230, 520);
-    bomb.setVelocity(dir * 135 + this.player.body.velocity.x * 0.35, -105);
-    bomb.setBounce(0.38).setDragX(180);
-    bomb.detonatesAt = time + 2000;
-    bomb.pickupType = "bomb";
-    AUDIO.tone(105, 0.08, "square", 0.06, 35);
-  }
+  deployBomb(time) { return MundoDinamica.deployBomb(this, time); }
 
-  detonateBomb(bomb) {
-    if (this.ending || !bomb?.active) return;
-    const x = bomb.x, y = bomb.y, radius = TILE * 2.65;
-    if (this.carried?.target === bomb) this.carried = null;
-    bomb.disableBody(true, true);
-    const removed = this.destroyTerrainCircle(x, y, 2.65);
-    this.cratesGroup.children.iterate(crate => {
-      if (crate?.active && Math.hypot(crate.x - x, crate.y - y) <= radius) this.breakCrate(crate);
-    });
-    this.destructiblesGroup.children.iterate(wall => {
-      if (wall?.active && Math.hypot(wall.x - x, wall.y - y) <= radius) this.breakWall(wall, true);
-    });
-    for (const entity of this.symbolicEntities || []) {
-      if (entity.state === "active" && Math.hypot(entity.x - x, entity.y - y) <= radius) entity.dissipate(this.time.now);
-    }
-    if (Math.hypot(this.player.x - x, this.player.y - y) <= radius) this.takeDamage(2, "explosion");
-    if (this.ending) return;
-    this.rubble.explode(Math.min(42, 12 + removed * 2), x, y);
-    this.spark.explode(28, x, y);
-    this.cameras.main.shake(250, 0.012);
-    AUDIO.demolition();
-  }
+  detonateBomb(bomb) { return MundoDinamica.detonateBomb(this, bomb); }
 
-  destroyTerrainCircle(worldX, worldY, radiusTiles = 2.5) {
-    if (this.ending || !this.terrain) return 0;
-    const centerX = Math.floor(worldX / TILE), centerY = Math.floor(worldY / TILE);
-    const limit = Math.ceil(radiusTiles);
-    let removed = 0;
-    for (let oy = -limit; oy <= limit; oy += 1) for (let ox = -limit; ox <= limit; ox += 1) {
-      if (ox * ox + oy * oy > radiusTiles * radiusTiles) continue;
-      const tx = centerX + ox, ty = centerY + oy;
-      if (ty < 0 || ty >= this.generated.rows || tx < 0 || tx >= this.generated.cols) continue;
-      if (this.generated.data[ty][tx] !== 1) continue;
-      this.terrain.removeTileAt(tx, ty, true, true);
-      this.generated.data[ty][tx] = -1;
-      const veinMark = this.veinMarks?.get(`${tx},${ty}`);
-      if (veinMark) { veinMark.destroy(); this.veinMarks.delete(`${tx},${ty}`); }
-      removed += 1;
-      if (this.rubble && removed <= 30) this.rubble.explode(1, tx * TILE + TILE / 2, ty * TILE + TILE / 2);
-    }
-    return removed;
-  }
+  destroyTerrainCircle(worldX, worldY, radiusTiles = 2.5) { return MundoDinamica.destroyTerrainCircle(this, worldX, worldY, radiusTiles); }
 
   breakCrate(crate) { return Destructibles.breakCrate(this, crate); }
 
-  updateWorldDynamics(time, dt) {
-    if (this.ending) return;
-    this.bombsGroup?.children.iterate(bomb => {
-      if (!bomb?.active) return;
-      const remaining = bomb.detonatesAt - time;
-      bomb.setTint(remaining < 500 && Math.floor(time / 70) % 2 ? 0xffffff : remaining < 1100 && Math.floor(time / 150) % 2 ? 0xff6b55 : 0xffffff);
-      bomb.angle += bomb.body.velocity.x * 0.05;
-      if (remaining <= 0) this.detonateBomb(bomb);
-    });
-    this.coinsGroup.children.iterate(coin => {
-      if (!coin || !coin.active) return;
-      coin.y += Math.sin(time * 0.004 + coin.phase) * 0.08;
-      coin.angle += 1.5;
-    });
-    this.fragmentsGroup.children.iterate(shard => {
-      if (!shard || !shard.active) return;
-      shard.y += Math.sin(time * 0.003 + shard.phase) * 0.1;
-      shard.angle += 0.8;
-    });
-    this.sporesGroup.children.iterate(spore => {
-      if (!spore || !spore.active) return;
-      spore.y += Math.sin(time * 0.0035 + spore.phase) * 0.06;
-    });
-    this.bouldersGroup.children.iterate(rock => {
-      if (!rock || !rock.active) return;
-      if (rock.sleepingStone && Math.abs(rock.x - this.player.x) < 76 && this.player.y > rock.y && this.player.y - rock.y < 390) {
-        rock.sleepingStone = false;
-        rock.body.allowGravity = true;
-        rock.setVelocity(Phaser.Math.Between(-45, 45), 40);
-        this.showMessage("El argumento rueda cuesta abajo.", 1600);
-        this.cameras.main.shake(80, 0.003);
-      }
-      rock.angle += rock.body.velocity.x * 0.035;
-      rock.impactSpeed = Math.max(rock.impactSpeed || 0, Math.abs(rock.body.velocity.x) + Math.abs(rock.body.velocity.y));
-    });
+  updateWorldDynamics(time, dt) { return MundoDinamica.updateWorldDynamics(this, time, dt); }
 
-    if (this.levelInfo.key === "jungle" && this.perceptionTimer > 0) {
-      this.perceptionTimer = Math.max(0, this.perceptionTimer - dt);
-      this.inverted = this.perceptionTimer > 0 && Math.floor(time / 950) % 2 === 0;
-    } else {
-      this.inverted = false;
-    }
-
-    if (this.levelInfo.key === "volcano") {
-      let inLava = false;
-      for (const zone of this.lavaZones) {
-        if (this.physics.overlap(this.player, zone)) inLava = true;
-      }
-      const onMainRoute = this.generated.mainCorridors.some(r => rectsOverlap(this.player.body, r, 8));
-      this.heat = clamp(this.heat + dt * (inLava ? 0.09 : onMainRoute ? -0.015 : 0.007), 0, 120);
-      if (this.ending) return;
-      if (inLava && time - this.lastDamageAt > 460) {
-        this.takeDamage(2, "lava");
-        if (this.ending) return;
-      }
-      if (this.heat >= 100 && time - this.lastDamageAt > 900) {
-        if (this.ending) return;
-        this.takeDamage(1, "heat");
-        if (this.ending) return;
-        this.heat = 55;
-      }
-      this.drawLava(time);
-    }
-
-    if (this.godPowerTimer > 0) {
-      this.godPowerTimer = Math.max(0, this.godPowerTimer - dt);
-      if (time % 120 < 20) this.blue.explode(1, this.player.x, this.player.y + 2);
-      if (this.godPowerTimer === 0) this.bottledPyre = false;
-    }
-  }
-
-  drawLava(time) {
-    if (!this.lavaGraphics) return;
-    this.lavaGraphics.clear();
-    for (const lava of this.generated.lava) {
-      this.lavaGraphics.fillStyle(0xff3f2e, 0.82);
-      this.lavaGraphics.fillRoundedRect(lava.x, lava.y, lava.width, lava.height, 4);
-      this.lavaGraphics.fillStyle(0xffd464, 0.72);
-      for (let x = lava.x; x < lava.x + lava.width; x += 18) {
-        const y = lava.y + 4 + Math.sin(time * 0.008 + x * 0.08) * 3;
-        this.lavaGraphics.fillCircle(x + 8, y, 4);
-      }
-    }
-  }
+  drawLava(time) { return MundoDinamica.drawLava(this, time); }
 
   updateHud(time, dt) { return Hud.updateHud(this, time, dt); }
 
-  updateLighting(time) {
-    const sw = screenW(this);
-    const sh = screenH(this);
-    const baseRadius = 215 + this.meta.lightBonus * 34;
-    const levelPenalty = this.levelInfo.darkness * 120;
-    const sporePenalty = this.perceptionTimer > 0 ? 78 : 0;
-    const normalRadius = clamp(baseRadius - levelPenalty - sporePenalty + (this.godPowerTimer > 0 ? 82 : 0), 120, 380);
-    const radius = this.riskFog ? normalRadius * 0.5 : normalRadius;
-    const cam = this.cameras.main;
-    const px = this.player.x - cam.scrollX;
-    const py = this.player.y - cam.scrollY;
-    this.darkness.clear();
-    this.darkness.fillStyle(0x020309, this.levelInfo.darkness + (this.perceptionTimer > 0 ? 0.15 : 0));
-    this.darkness.fillRect(0, 0, sw, sh);
-    this.lightGlow.clear();
-    this.lightGlow.fillStyle(this.levelInfo.accent, 0.08);
-    this.lightGlow.fillCircle(px, py, radius);
-    this.lightGlow.fillStyle(0xffffff, 0.04);
-    this.lightGlow.fillCircle(px, py, radius * 0.58 + Math.sin(time * 0.003) * 8);
-  }
+  updateLighting(time) { return MundoDinamica.updateLighting(this, time); }
 
-  collectCoin(player, coin) {
-    if (this.ending) return;
-    coin.disableBody(true, true);
-    this.coins += this.abyssBagCharges > 0 ? 2 : 1;
-    if (this.abyssBagCharges > 0) this.abyssBagCharges -= 1;
-    this.spark.explode(8, coin.x, coin.y);
-    AUDIO.coin();
-    if (this.levelInfo.key === "desert" && this.coins % 5 === 0) {
-      this.showMessage("La riqueza se instala en tus huesos.", 1600);
-    }
-  }
+  collectCoin(player, coin) { return MundoDinamica.collectCoin(this, player, coin); }
 
-  collectFragment(player, shard) {
-    if (this.ending) return;
-    if (!shard.active) return;
-    if (shard.dramaticId) {
-      const route = this.generated.dramaticRoutes.find(r => r.id === shard.dramaticId);
-      if (!route?.unlocked) return;
-      route.collected = true;
-      const entry = this.dramaticLabels.find(item => item.route.id === route.id);
-      if (entry) entry.label.setText("RUTA DRAMÁTICA\nOFRENDA RECORDADA");
-    }
-    shard.disableBody(true, true);
-    this.runFragments += 1;
-    setRunFragmentBank(this.runFragments);
-    this.blue.explode(16, shard.x, shard.y);
-    AUDIO.fragment();
-    this.showMessage("Un pensamiento sobrevive al cuerpo.", 1500);
-  }
+  collectFragment(player, shard) { return MundoDinamica.collectFragment(this, player, shard); }
 
-  touchSpore(player, spore) {
-    if (this.ending) return;
-    spore.disableBody(true, true);
-    this.perceptionTimer = 7600;
-    this.sporeMist.explode(28, spore.x, spore.y);
-    AUDIO.tone(220, 0.18, "triangle", 0.09, 220);
-    this.showMessage("La selva toma prestada tu certeza.", 2100);
-  }
+  touchSpore(player, spore) { return MundoDinamica.touchSpore(this, player, spore); }
 
   onPushCrate(player, crate) { return Manos.onPushCrate(this, player, crate); }
 
