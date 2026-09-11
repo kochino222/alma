@@ -21,6 +21,7 @@ import * as Mercader from "../sistemas/mercader.js";
 import * as Destructibles from "../sistemas/destructibles.js";
 import * as Manos from "../sistemas/manos.js";
 import * as Hud from "../sistemas/hud.js";
+import * as Altar from "../sistemas/altar.js";
 const Between = Phaser.Math.Between;
 
 export class GameScene extends Phaser.Scene {
@@ -1611,33 +1612,7 @@ export class GameScene extends Phaser.Scene {
 
   useSpecialRoom(room, time) { return Mercader.useSpecialRoom(this, room, time); }
 
-  sacrificeForRoute(route, useLife = false) {
-    if (route.unlocked) {
-      this.showMessage("Acceso abierto. Saltá desde la flecha y mantené el salto para alcanzar el fragmento.", 2800);
-      return;
-    }
-    let price;
-    if (!useLife && this.coins > 0) {
-      price = `${this.coins} monedas`;
-      this.coins = 0;
-    } else if (this.hp > 1) {
-      this.hp -= 1;
-      price = "1 vida";
-    } else {
-      this.showMessage("Falta una ofrenda: oro o más de una vida. La ruta principal sigue abierta.", 2600);
-      AUDIO.reject();
-      return;
-    }
-    route.unlocked = true;
-    this.destructiblesGroup.children.iterate(wall => {
-      if (wall?.active && wall.dramaticId === route.id) this.breakWall(wall);
-    });
-    const entry = this.dramaticLabels.find(item => item.route.id === route.id);
-    if (entry) entry.label.setText("RUTA DRAMÁTICA\nSALTO DE RENUNCIA").setColor("#8af0b0");
-    this.blue.explode(20, route.x, route.y);
-    AUDIO.altar();
-    this.showMessage(`Ofrenda: ${price}. Acceso abierto; mantené el salto desde la flecha.`, 3400);
-  }
+  sacrificeForRoute(route, useLife = false) { return Altar.sacrificeForRoute(this, route, useLife); }
 
   deployBomb(time) {
     if (this.ending) return;
@@ -1861,65 +1836,11 @@ export class GameScene extends Phaser.Scene {
 
   destructiveImpulse(time) { return Destructibles.destructiveImpulse(this, time); }
 
-  useAltar() {
-    const price = inflatedPrice(this.worldNumber);
-    if (this.hp >= this.maxHp) {
-      this.showMessage("El altar no encuentra una herida que cerrar.", 1500);
-      AUDIO.reject();
-      return;
-    }
-    if (this.coins < price) {
-      this.showMessage(`El altar exige ${price} monedas por 1 HP.`, 1500);
-      AUDIO.reject();
-      return;
-    }
-    this.coins -= price;
-    this.hp = Math.min(this.maxHp, this.hp + 1);
-    this.blue.explode(22, this.nearAltar.x, this.nearAltar.y);
-    AUDIO.altar();
-    this.showMessage(`El altar devuelve 1 HP por ${price} monedas.`, 2000);
-  }
+  useAltar() { return Altar.useAltar(this); }
 
-  negotiateWithGod() {
-    if (this.runFragments >= 3) {
-      this.completeRun();
-      return;
-    }
-    if (this.coins >= 10) {
-      this.coins -= 10;
-      this.runFragments += 2;
-      setRunFragmentBank(this.runFragments);
-      this.blue.explode(44, this.player.x, this.player.y);
-      AUDIO.altar();
-      this.showMessage("Dios acepta la broma de la propiedad.", 2200);
-      return;
-    }
-    this.showMessage("Dios no dice nada. Quizá esa sea la respuesta.", 2200);
-    AUDIO.tone(55, 0.4, "sine", 0.09, 0);
-  }
+  negotiateWithGod() { return Altar.negotiateWithGod(this); }
 
-  absorbGodPower(time) {
-    if (this.runFragments < 1) {
-      this.showMessage("No queda conciencia para quemar.", 1600);
-      AUDIO.reject();
-      return;
-    }
-    this.runFragments -= 1;
-    setRunFragmentBank(this.runFragments);
-    this.godPowerTimer = 8000;
-    this.invulnUntil = time + 500;
-    this.cameras.main.flash(220, 145, 247, 255);
-    this.cameras.main.shake(220, 0.006);
-    this.blue.explode(55, this.player.x, this.player.y);
-    this.destroyTerrainCircle(this.player.x, this.player.y, 2.35);
-    AUDIO.fragment();
-    if (this.hp > 1 && this.rng() < 0.35) {
-      this.hp -= 1;
-      this.showMessage("El poder de Dios no cabe bien en un cuerpo en blanco.", 2100);
-    } else {
-      this.showMessage("Durante ocho segundos, se filtra la autoría.", 2100);
-    }
-  }
+  absorbGodPower(time) { return Altar.absorbGodPower(this, time); }
 
   takeDamage(amount, source) {
     // Requerimiento #1: primerísima línea. Blinda contra daño letal duplicado
