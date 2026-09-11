@@ -25,6 +25,7 @@ import * as Altar from "../sistemas/altar.js";
 import * as Progresion from "../sistemas/progresion.js";
 import * as Combate from "../sistemas/combate.js";
 import * as MundoDinamica from "../sistemas/mundo-dinamica.js";
+import * as Interaccion from "../sistemas/interaccion.js";
 const Between = Phaser.Math.Between;
 
 export class GameScene extends Phaser.Scene {
@@ -1322,53 +1323,7 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  handleInteractions(controls, time) {
-    if (controls.interactPressed) {
-      if (this.carried) {
-        this.dropCarried(time);
-        return;
-      }
-      if (this.graceAvailable) {
-        this.surrenderToAstral("grace");
-        return;
-      }
-      if (this.tryPickupNearby(time, controls.down || Boolean(this.nearStunned))) return;
-      const grounded = this.player.body.blocked.down || this.player.body.touching.down || this.onSlope;
-      if (controls.down && grounded) {
-        if (this.ending || this.hp <= 0) return;
-        this.seismicLifeStrike(time);
-        return;
-      }
-      if (this.nearExit) {
-        this.descend();
-        return;
-      }
-      if (this.nearMerchant) {
-        this.buyMerchantItem(time);
-        return;
-      }
-      if (this.nearSpecial) {
-        this.useSpecialRoom(this.nearSpecial, time);
-        return;
-      }
-      if (this.nearDramatic) {
-        this.sacrificeForRoute(this.nearDramatic);
-        return;
-      }
-      if (this.nearAltar) {
-        this.useAltar();
-        return;
-      }
-      if (this.nearGod) {
-        this.negotiateWithGod();
-        return;
-      }
-      if (this.nearSymbolic) {
-        this.absorbSymbolic(this.nearSymbolic, time);
-        return;
-      }
-    }
-  }
+  handleInteractions(controls, time) { return Interaccion.handleInteractions(this, controls, time); }
 
   nearbyPortable(includeSymbolic = true) { return Manos.nearbyPortable(this, includeSymbolic); }
 
@@ -1390,73 +1345,11 @@ export class GameScene extends Phaser.Scene {
 
   seismicLifeStrike(time) { return Destructibles.seismicLifeStrike(this, time); }
 
-  hasVerticalEscape() {
-    if (!this.terrain || !this.player?.body) return true;
-    const tx = Math.floor(this.player.x / TILE);
-    const footTy = Math.floor(this.player.body.bottom / TILE);
-    const maxRiseTiles = Math.max(5, Math.floor(JUMP_SPEED ** 2 / (2 * Math.max(1, this.physics.world.gravity.y) * TILE)));
-    for (let ox = -2; ox <= 2; ox += 1) {
-      let clear = true;
-      for (let oy = 1; oy <= maxRiseTiles; oy += 1) {
-        if (this.generated.data[footTy - oy]?.[tx + ox] === 1) { clear = false; break; }
-      }
-      if (clear) return true;
-    }
-    return false;
-  }
+  hasVerticalEscape() { return Interaccion.hasVerticalEscape(this); }
 
-  isCaveConfined() {
-    const tx = Math.floor(this.player.x / TILE);
-    const ty = Math.floor(this.player.y / TILE);
-    const solid = (x, y) => this.generated.data[y]?.[x] === 1;
-    const leftClosed = [1, 2].some(distance => [0, 1].every(dy => solid(tx - distance, ty + dy)));
-    const rightClosed = [1, 2].some(distance => [0, 1].every(dy => solid(tx + distance, ty + dy)));
-    return leftClosed && rightClosed && !this.hasVerticalEscape();
-  }
+  isCaveConfined() { return Interaccion.isCaveConfined(this); }
 
-  updateCaveSafeguards(controls, time) {
-    if (this.ending) return;
-    const grounded = this.player.body.blocked.down || this.player.body.touching.down || this.onSlope;
-    if (!this.confinementAnchor) this.confinementAnchor = { x: this.player.x, y: this.player.y };
-    if (Math.abs(this.player.x - this.confinementAnchor.x) > 64 || Math.abs(this.player.y - this.confinementAnchor.y) > 96 || !grounded) {
-      this.confinementAnchor = { x: this.player.x, y: this.player.y };
-      this.confinedSince = 0;
-      this.graceAvailable = false;
-    } else if (this.isCaveConfined()) {
-      if (!this.confinedSince) this.confinedSince = time;
-      this.graceAvailable = time - this.confinedSince >= 7000;
-    } else {
-      this.confinedSince = 0;
-      this.graceAvailable = false;
-    }
-
-    const contextual = this.carried || this.nearbyPortable() || this.nearExit || this.nearMerchant || this.nearSpecial ||
-      this.nearDramatic || this.nearAltar || this.nearGod || this.nearSymbolic;
-    const canChannel = grounded && !controls.down && !contextual && time >= this.interactionConsumedUntil;
-    if (controls.interact && canChannel) {
-      if (!this.actionHoldStartedAt) this.actionHoldStartedAt = time;
-      const progress = clamp((time - this.actionHoldStartedAt) / 2500, 0, 1);
-      this.channelRing.clear();
-      this.channelRing.lineStyle(2 + progress * 3, 0x9dfcff, 0.35 + progress * 0.6);
-      this.channelRing.strokeCircle(this.player.x, this.player.y, 58 - progress * 38);
-      if (time >= this.channelToneAt) {
-        AUDIO.tone(110 + progress * 330, 0.12, "sine", 0.025 + progress * 0.045, 35);
-        this.channelToneAt = time + Math.max(90, 260 - progress * 150);
-        this.blue.explode(2, this.player.x + Phaser.Math.Between(-42, 42), this.player.y + Phaser.Math.Between(-34, 34));
-      }
-      // Disolución del Ego completada: disuelve la conciencia. Marcamos la
-      // muerte como suicidio (isSuicide=true) para que die() aplique la
-      // penalización de fragmentos de forma segura.
-      if (progress >= 1) { this.hp = 0; this.die(true); return; }
-    } else {
-      if (controls.interactReleased && this.actionHoldStartedAt && time - this.actionHoldStartedAt < 420 && this.levelInfo.key === "volcano" && !contextual) {
-        this.destructiveImpulse(time);
-      }
-      this.actionHoldStartedAt = 0;
-      this.channelToneAt = 0;
-      this.channelRing.clear();
-    }
-  }
+  updateCaveSafeguards(controls, time) { return Interaccion.updateCaveSafeguards(this, controls, time); }
 
   surrenderToAstral(reason) { return Progresion.surrenderToAstral(this, reason); }
 
