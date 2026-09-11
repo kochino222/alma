@@ -22,6 +22,7 @@ import * as Destructibles from "../sistemas/destructibles.js";
 import * as Manos from "../sistemas/manos.js";
 import * as Hud from "../sistemas/hud.js";
 import * as Altar from "../sistemas/altar.js";
+import * as Progresion from "../sistemas/progresion.js";
 const Between = Phaser.Math.Between;
 
 export class GameScene extends Phaser.Scene {
@@ -1518,13 +1519,7 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  surrenderToAstral(reason) {
-    if (this.ending) return;
-    this.preserveEtherealGold();
-    this.ending = true;
-    this.stopForAstral();
-    this.startAstral(false, reason);
-  }
+  surrenderToAstral(reason) { return Progresion.surrenderToAstral(this, reason); }
 
   updateProximity() {
     // Requerimiento #2: si el juego ya está acabando, ocultá el prompt de
@@ -1888,235 +1883,19 @@ export class GameScene extends Phaser.Scene {
     if (this.ending) return;
   }
 
-  checkDeathPlane() {
-    if (this.ending) return;
-    if (this.hp <= 0 || !this.player?.body) return;
-    if (this.player.y > this.generated.rows * TILE + 120) {
-      this.player.body.stop();
-      this.player.body.enable = false;
-      if (this.ending) return;
-      this.hp = 0;
-      this.preserveEtherealGold();
-      this.ending = true;
-      this.stopForAstral();
-      if (!this.ending) return;
-      this.startAstral(false, "death");
-    }
-  }
+  checkDeathPlane() { return Progresion.checkDeathPlane(this); }
 
-  descend() {
-    if (this.ending) return;
-    if (this.usedExit) return;
-    this.usedExit = true;
-    this.runFragments += 1;
-    setRunFragmentBank(this.runFragments);
-    this.blue.explode(30, this.exitDoor.x, this.exitDoor.y);
-    AUDIO.fragment();
-    if (this.levelNumber >= TOTAL_STAGES) {
-      this.completeRun();
-      return;
-    }
-    this.cameras.main.fadeOut(300, 4, 6, 10);
-    this.time.delayedCall(320, () => {
-      if (this.ending) return;
-      this.scene.start("Game", {
-        level: this.levelNumber + 1,
-        seed: this.seed,
-        runId: this.runId,
-        isCustomSeed: this.isCustomSeed,
-        coins: this.coins,
-        fragments: this.runFragments,
-        hp: this.hp,
-        maxHp: this.maxHp,
-        creditPact: this.creditPact,
-        bombs: this.bombs
-      });
-    });
-  }
+  descend() { return Progresion.descend(this); }
 
-  stopForAstral() {
-    // Freeze before scene.start: shutdown may destroy objects synchronously.
-    if (this.player?.body) {
-      this.player.body.stop();
-      this.player.body.enable = false;
-    }
-    const world = this.physics.world;
-    for (const body of [...(world?.bodies?.entries || []), ...(world?.staticBodies?.entries || [])]) body.enable = false;
-    for (const collider of world?.colliders?.getActive?.() || []) collider.active = false;
-    this.physics.pause();
-    this.controls.releaseAll();
-    this.cameras.main.stopFollow();
-    this.cameras.main.resetFX();
-    this.tweens.pauseAll();
-    this.time.removeAllEvents();
-    for (const emitter of [this.dust, this.footDust, this.spark, this.blue, this.sporeMist, this.rubble]) {
-      if (emitter) emitter.setActive(false);
-    }
-    this.channelRing?.clear();
-    for (const attack of this.symbolicAttacks || []) attack.graphics?.destroy();
-    this.symbolicAttacks = [];
-    AUDIO.stopDrone();
-  }
+  stopForAstral() { return Progresion.stopForAstral(this); }
 
-  completeRun() {
-    if (this.ending) return;
-    this.ending = true;
-    this.stopForAstral();
-    const meta = loadMeta();
-    meta.ascensions += 1;
-    saveMeta(meta);
-    this.startAstral(true, "transcendence", 4);
-  }
+  completeRun() { return Progresion.completeRun(this); }
 
-  startAstral(victory, reason, bonusFragments = 0) {
-    if (!this.ending) return;
-    this.scene.start("Astral", {
-      victory,
-      runId: this.runId,
-      isCustomSeed: this.isCustomSeed,
-      runFragments: this.runFragments + bonusFragments,
-      reachedLevel: this.levelNumber,
-      reason
-    });
-  }
+  startAstral(victory, reason, bonusFragments = 0) { return Progresion.startAstral(this, victory, reason, bonusFragments); }
 
-  die(isSuicide = false) {
-    // Guard: ya estamos muriendo o ya empezamos a transicionar al Astral.
-    if (this.ending) return;
+  die(isSuicide = false) { return Progresion.die(this, isSuicide); }
 
-    // Requerimiento #1: marcar el estado de muerte antes de cualquier otra cosa
-    // para que update(), colisiones y otros handlers no-actúen sobre un jugador moribundo.
-    this.ending = true;
-
-    // Preservar oro etéreo (igual que antes) — debe ocurrir antes del freeze total.
-    this.preserveEtherealGold();
-
-    // PENALIZACIÓN DE LA "DISOLUCIÓN DEL EGO" (suicidio):
-    // Al disolver el ego se disipa la conciencia recolectada (fragmentos).
-    // Este bloque manipula EXCLUSIVAMENTE variables (lógica pura): la reducción
-    // de fragmentos se aplica siempre, pero cualquier actualización visual del
-    // HUD o sonido relacionado con fragmentos queda detrás de una guarda estricta
-    // (`if (!this.ending)`) Y de un try/catch, para que un fallo aquí jamás
-    // detenga el ciclo de Phaser ni congele el juego.
-    if (isSuicide && (this.runFragments || 0) > 0) {
-      try {
-        // Reset a nivel de variables + sin-cronización con el banco de la run.
-        this.runFragments = 0;
-        setRunFragmentBank(0);
-
-        // Guardas estrictas: con this.ending === true (como ocurre al llegar
-        // aquí) NO tocamos HUD ni sonido; el loop de update() ya no pinta el HUD.
-        if (!this.ending) this.updateHud?.(this.time.now, 0);
-        if (!this.ending && AUDIO?.unlocked) AUDIO.reject?.();
-      } catch (err) {
-        if (window.console) {
-          console.error("[Alma en Blanco] penalización de fragmentos (Disolución del Ego) falló: no se interrumpe la muerte.", err);
-        }
-      }
-    }
-
-    // Snapshot de la posición del jugador en el momento exacto de la muerte,
-    // porque stopForAstral() viene después y la escena se reinicia.
-    const deathX = this.player?.x ?? 0;
-    const deathY = this.player?.y ?? 0;
-
-    // Requerimiento #2: pausar las físicas del jugador manualmente.
-    // (stopForAstral() también lo hace, pero lo aplicamos YA para que el sprite
-    // quede quieto durante la animación de 1.5s. Ojo: NO llamamos stopForAstral()
-    // todavía porque hace this.time.removeAllEvents() y mataría nuestro delayedCall.)
-    // Requerimiento #3: desvincular al jugador de la escalera y restaurar la
-    // gravedad normal para que un cuerpo pausado no reciba gravedad especial.
-    this.onLadder = false;
-    if (this.player?.body) {
-      this.player.body.allowGravity = true;
-      this.player.body.stop();
-      this.player.body.enable = false;
-    }
-
-    // Requerimiento #3: ocultar el sprite del jugador. El cuerpo físico ya está
-    // desactivado, así que no hay riesgo de quedar atrapado en colisiones.
-    if (this.player) {
-      this.player.setVisible(false);
-    }
-
-    // Requerimiento #4: explosión de partículas en la posición exacta del jugador.
-    // Patrón idéntico al de this.rubble (línea ~1692): emitter pre-creado,
-    // emitting:false por defecto, y luego .explode(N, x, y) para detonar.
-    // Usamos "particle-blue" + "particle-white" mezcladas en dos passes para
-    // un efecto más dramático que el rubble de color único del nivel.
-    if (!this.deathBurst) {
-      this.deathBurst = this.add.particles(0, 0, "particle-blue", {
-        lifespan: { min: 520, max: 1100 },
-        speed: { min: 90, max: 260 },
-        angle: { min: 0, max: 360 },
-        gravityY: 380,
-        scale: { start: 0.9, end: 0 },
-        alpha: { start: 1, end: 0 },
-        maxParticles: 60,
-        emitting: false
-      }).setDepth(20);
-    }
-    // Detonamos 24 partículas azules en todas direcciones.
-    this.deathBurst.explode(24, deathX, deathY);
-
-    // Segundo pass con partículas blancas para dar destello interior.
-    if (!this.deathSpark) {
-      this.deathSpark = this.add.particles(0, 0, "particle-white", {
-        lifespan: { min: 280, max: 540 },
-        speed: { min: 60, max: 180 },
-        angle: { min: 0, max: 360 },
-        gravityY: 220,
-        scale: { start: 0.6, end: 0 },
-        alpha: { start: 1, end: 0 },
-        maxParticles: 40,
-        emitting: false
-      }).setDepth(21);
-    }
-    this.deathSpark.explode(18, deathX, deathY);
-
-    // Un pequeño flash en la cámara para anclar el momento dramático.
-    this.cameras.main.flash(180, 220, 240, 255);
-
-    // Requerimiento #5: sonido de muerte sintético.
-    // No modificamos el AudioEngine (fuera del alcance). Construimos un
-    // acorde descendente con AUDIO.tone() — onda sine grave + glide negativo.
-    if (AUDIO?.unlocked) {
-      AUDIO.tone(110, 0.9, "sine", 0.16, -90);   // bajo que desciende al abismo
-      AUDIO.tone(165, 0.7, "triangle", 0.08, -130); // quinta que cae más rápido
-      AUDIO.noise(0.35, 0.05, 320);              // ruido sutil = "alma dispersándose"
-    }
-
-    // Requerimiento #6: temporizador de 1500ms antes de cambiar de escena.
-    // Recién acá invocamos stopForAstral() (que hace removeAllEvents() pero ya
-    // está nuestro delayedCall en cola y se ejecutará antes de que eso importe).
-    // Guardamos el runId y los fragmentos en locales porque después del
-    // stopForAstral() el contexto del scene puede limpiar referencias.
-    const payload = {
-      victory: false,
-      runId: this.runId,
-      isCustomSeed: this.isCustomSeed,
-      runFragments: this.runFragments,
-      reachedLevel: this.levelNumber,
-      reason: "death"
-    };
-    const self = this;
-    this.time.delayedCall(1500, function() {
-      self.stopForAstral();
-      self.scene.start("Astral", payload);
-    });
-  }
-
-  preserveEtherealGold() {
-    if (this.etherealGoldPreserved) return;
-    this.etherealGoldPreserved = true;
-    if (lawActive(this.meta, "etherealBond") && this.coins > 0) {
-      const preserved = Math.floor(this.coins * 0.15);
-      if (preserved > 0) {
-        this.runFragments = clamp(this.runFragments + preserved, 0, 999);
-        setRunFragmentBank(this.runFragments);
-      }
-    }
-  }
+  preserveEtherealGold() { return Progresion.preserveEtherealGold(this); }
 
   showMessage(text, duration = 1600) { return Hud.showMessage(this, text, duration); }
 }
