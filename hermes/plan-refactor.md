@@ -1,7 +1,7 @@
 # Plan de refactor — Alma en Blanco
 
 > Documento vivo. Escrito por Herminia (asistente de Santiago) para que el plan **no dependa de una conversación**.
-> **Fases 0, 1 y 2 completadas** — rama `fix-camara-idle`, tag de seguridad `pre-refactor-2026-09-09`.
+> **Fases 0, 1, 2 y 3 completadas** — rama `refactor-fase3`, tag de seguridad `pre-refactor-2026-09-09`.
 
 ---
 
@@ -20,7 +20,7 @@ Es un refactor de *estructura*, no de *comportamiento*. Al terminar, el juego de
 | `index.html` | 25 | Carga Phaser 3.80.1 (CDN) + un solo `<script type="module">` |
 | `juego.js` | **102** | Punto de entrada: imports + `config` + arranque. Sin lógica de juego |
 | `art_data.js` | 387 | Módulo ES. `export const ArtData` + puente `window.ArtData` |
-| `src/` | 4828 | 14 módulos con responsabilidad única (ver abajo) |
+| `src/` | 5079 | 25 módulos con responsabilidad única (ver abajo) |
 | `devpanel.js` | 399 | Panel de desarrollo (long-press 500ms en el badge de versión) |
 | `hermes/verificar.html` | — | Verificador automático: Phaser, escenas, texturas, self-test 48 mapas |
 | `hermes/verificar-gamescene.html` | — | Verificador de `GameScene`: 25 checks de sistemas, física y cruces entre módulos |
@@ -36,7 +36,7 @@ Es un refactor de *estructura*, no de *comportamiento*. Al terminar, el juego de
 | `src/audio/AudioEngine.js` | 128 | `class AudioEngine` **+ singleton `AUDIO`** |
 | `src/escenas/BootScene.js` | 23 | Genera texturas y arranca el menú |
 | `src/escenas/MenuScene.js` | 156 | Menú principal |
-| `src/escenas/GameScene.js` | **2702** | Escena de juego (los 79 métodos, todavía sin partir) |
+| `src/escenas/GameScene.js` | **407** | Orquestador: `create`/`update`/`setupCollisions` + 79 fachadas que delegan a `src/sistemas/` |
 | `src/escenas/AstralScene.js` | 221 | Meta-progreso / negociación de leyes |
 | `src/escenas/PauseScene.js` | 117 | Pausa + copia de semilla |
 | `src/mundo/ProceduralMap.js` | 487 | Generador procedural + su `selfTest()` |
@@ -44,6 +44,7 @@ Es un refactor de *estructura*, no de *comportamiento*. Al terminar, el juego de
 | `src/controles/ControlRig.js` | 287 | Teclado + táctil multitáctil |
 | `src/controles/touchGuards.js` | 16 | Bloqueo de gestos nativos del canvas |
 | `src/sistemas/selfTests.js` | 59 | `installSelfTests`, `installNativeTouchGuards` |
+| `src/sistemas/` (11 módulos Fase 3) | 2521 | `mercader`, `destructibles`, `manos`, `hud`, `altar`, `progresion`, `combate`, `mundo-dinamica`, `interaccion`, `movimiento`, `construccion` — detalle en `plan-fase3-gamescene.md` |
 
 ### Tres ajustes obligatorios que se aplicaron (dependencias cruzadas)
 
@@ -132,7 +133,7 @@ Un commit por bloque lógico, verificando en cada paso. Orden ejecutado:
 
 Pendiente de Fase 2 (cosmético): reemplazar el puente `window.ArtData` por un `import { ArtData }` real, y normalizar la indentación de 4 espacios a 2.
 
-### ⬜ Fase 3 — Partir `GameScene` (PENDIENTE — el refactor de verdad)
+### ✅ Fase 3 — Partir `GameScene` (COMPLETADA — 2026-09-11)
 
 `GameScene` queda como orquestador (Phaser exige una clase de escena) y los 79 métodos se agrupan en módulos de sistema que la escena compone:
 
@@ -153,7 +154,12 @@ Criterio de corte: **módulos que reciben `scene` como parámetro** (patrón "si
 
 👉 `GameScene` final esperado: **~300–400 líneas**.
 
-> ⚠️ **Advertencia para la Fase 3**: es la fase más riesgosa. Cada sistema extraído debe correr `hermes/verificar-gamescene.html` (25 checks) antes de seguir. Un commit por sistema, nunca dos.
+**Resultado (2026-09-11, rama `refactor-fase3`, 11 commits):**
+- 11 módulos en `src/sistemas/` (2521 líneas): `mercader`, `destructibles`, `manos`, `hud`, `altar`, `progresion`, `combate`, `mundo-dinamica`, `interaccion`, `movimiento`, `construccion`.
+- `GameScene.js`: 2702 → **407 líneas**. Patrón **fachada + sistema**: cada método queda como fachada de una línea que delega a una función `(scene, ...)`; así no se tocaron `setupCollisions` ni el harness.
+- Limpieza de 17 imports muertos en GameScene; 0 `this` desnudos y 0 imports muertos en los módulos.
+- Ambos harness `OK` (25 checks + self-test 48 mapas). Flake pre-existente documentado: el check "recoger moneda" falla ~1 de cada 3-6 corridas por timing físico en headless (no es regresión).
+- Ejecutado por subagente `deepseek-v4-flash`; cierre (Tarea 12) por Herminia.
 
 ### ⬜ Fase 4 — Cierre
 - Actualizar `GDD.md` / `ART_BIBLE.md` con la nueva estructura.
@@ -219,8 +225,8 @@ chrome --headless=new --virtual-time-budget=20000 --dump-dom http://127.0.0.1:81
 |---|---|---|---|
 | 2026-09-09 | 0 | ✅ hecho | Tag `pre-refactor-2026-09-09`, plan commiteado (`2376af1`) |
 | 2026-09-09 | 1 | ✅ hecho | ES Modules; **11/11 campos idénticos** vs. el estado anterior y self-test byte a byte igual |
-| — | 2 | ⬜ pendiente | Delegable a modelo barato |
-| — | 3 | ⬜ pendiente | — |
+| 2026-09-11 | 2 | ✅ hecho | `juego.js` 4837→102; 14 módulos en `src/` |
+| 2026-09-11 | 3 | ✅ hecho | 11 módulos en `src/sistemas/`; GameScene 2702→407; fachadas; ambos harness `OK` |
 | — | 4 | ⬜ pendiente | — |
 
 ### Evidencia de la Fase 1

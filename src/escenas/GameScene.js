@@ -2,15 +2,13 @@
 // Extraído de juego.js (Fase 2 refactor)
 
 import {
-  LEVELS, TILE, BASE_GRAVITY, TOTAL_STAGES, JUMP_SPEED, SACRIFICE_JUMP_SPEED, LAW_DEFS
+  LEVELS, TILE, BASE_GRAVITY, TOTAL_STAGES
 } from "../core/constantes.js";
 import {
-  clamp, screenW, screenH, hashSeed, mulberry32, randInt, rectsOverlap, makeRect
+  clamp, hashSeed, mulberry32
 } from "../core/utils.js";
 import {
-  loadMeta, saveMeta, gravityMultiplier, trapMultiplier, economyMultiplier,
-  inflationMultiplier, inflatedPrice, daggerReward, lawActive,
-  runFragmentBank, setRunFragmentBank, effectiveCoinBurden, playerMoveSpeed, newRunId
+  loadMeta, gravityMultiplier, lawActive, runFragmentBank, newRunId
 } from "../core/guardado.js";
 import { AUDIO } from "../audio/AudioEngine.js";
 import { ProceduralMap } from "../mundo/ProceduralMap.js";
