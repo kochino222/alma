@@ -17,6 +17,7 @@ import { ProceduralMap } from "../mundo/ProceduralMap.js";
 import { SymbolicEntity } from "../entidades/SymbolicEntity.js";
 import { ControlRig } from "../controles/ControlRig.js";
 
+import * as Mercader from "../sistemas/mercader.js";
 const Between = Phaser.Math.Between;
 
 export class GameScene extends Phaser.Scene {
@@ -1870,118 +1871,15 @@ export class GameScene extends Phaser.Scene {
     return true;
   }
 
-  cycleMerchant() {
-    this.merchantSelection = (this.merchantSelection + 1) % this.merchantOffers().length;
-    AUDIO.tone(330 + this.merchantSelection * 55, 0.06, "square", 0.035);
-    this.showMessage(`Mercader: ${this.merchantOffers()[this.merchantSelection].label}`, 1400);
-  }
+  cycleMerchant() { return Mercader.cycleMerchant(this); }
 
-  merchantOffers() {
-    const price = inflatedPrice(this.worldNumber);
-    return [
-      { key: "feather", label: `Botas Pluma · ${price} oro` },
-      { key: "mirror", label: `Espejo Guardián · ${price} oro` },
-      { key: "bag", label: `Bolsa del Abismo · ${price} oro` },
-      { key: "anchor", label: `Ancla de la Certeza · ${price} oro` },
-      { key: "pyre", label: `Pira Embotellada · ${price} oro` },
-      { key: "bombs", label: `Paquete de 3 bombas · ${price} oro` },
-      { key: "heal", label: `Curación +1 HP · ${price} oro` },
-      { key: "dagger", label: `Daga · 1 vida → ${daggerReward(this.worldNumber)} oro` },
-      { key: "credit", label: `Pacto de Crédito · +${Math.round(100 * inflationMultiplier(this.worldNumber))} oro` }
-    ];
-  }
+  merchantOffers() { return Mercader.merchantOffers(this); }
 
-  buyMerchantItem(time) {
-    const offer = this.merchantOffers()[this.merchantSelection];
-    const price = inflatedPrice(this.worldNumber);
-    if (offer.key === "feather") {
-      if (this.featherBoots) return this.showMessage("Las Botas Pluma ya niegan el peso de este nivel.", 1600);
-      if (this.coins < price) return this.rejectPurchase(`Las Botas Pluma cuestan ${price} monedas.`);
-      this.coins -= price; this.featherBoots = true;
-      this.showMessage("Botas Pluma: el oro deja de pesar durante este nivel.", 2100);
-    } else if (offer.key === "mirror") {
-      if (this.guardianMirror) return this.showMessage("El Espejo Guardián ya espera un impacto.", 1600);
-      if (this.coins < price) return this.rejectPurchase(`El Espejo Guardián cuesta ${price} monedas.`);
-      this.coins -= price; this.guardianMirror = true;
-      this.showMessage("Espejo Guardián: el próximo daño será reflejado al vacío.", 2100);
-    } else if (offer.key === "bag") {
-      if (this.abyssBagCharges > 0) return this.showMessage("La Bolsa todavía recoge ecos de monedas.", 1500);
-      if (this.coins < price) return this.rejectPurchase(`La Bolsa del Abismo cuesta ${price} monedas.`);
-      this.coins -= price; this.abyssBagCharges = 15;
-      this.showMessage("Bolsa del Abismo: duplica las próximas 15 monedas.", 2000);
-    } else if (offer.key === "anchor") {
-      if (this.certaintyAnchor) return this.showMessage("El Ancla ya fija tu certeza en este nivel.", 1500);
-      if (this.coins < price) return this.rejectPurchase(`El Ancla de la Certeza cuesta ${price} monedas.`);
-      this.coins -= price; this.certaintyAnchor = true;
-      this.inverted = false; this.doubtUntil = 0;
-      this.showMessage("Ancla de la Certeza: las inversiones ya no te gobiernan.", 2100);
-    } else if (offer.key === "pyre") {
-      if (this.bottledPyre) return this.showMessage("Ya llevás una Pira Embotellada.", 1500);
-      if (this.coins < price) return this.rejectPurchase(`La Pira Embotellada cuesta ${price} monedas.`);
-      this.coins -= price; this.bottledPyre = true;
-      this.godPowerTimer = Math.max(this.godPowerTimer, 10000);
-      this.showMessage("Pira Embotellada: diez segundos de impulso abrasador.", 2100);
-    } else if (offer.key === "bombs") {
-      if (this.coins < price) return this.rejectPurchase(`Tres bombas cuestan ${price} monedas.`);
-      this.coins -= price; this.bombs += 3;
-      this.showMessage("El Mercader entrega tres promesas con mecha.", 1900);
-    } else if (offer.key === "heal") {
-      if (this.hp >= this.maxHp) return this.rejectPurchase("Tu vida ya está completa.");
-      if (this.coins < price) return this.rejectPurchase(`Curarse cuesta ${price} monedas.`);
-      this.coins -= price; this.hp = Math.min(this.maxHp, this.hp + 1);
-      this.showMessage(`Curación: ${price} monedas por 1 HP.`, 1700);
-    } else if (offer.key === "dagger") {
-      if (this.sacrificeDaggerUsed) return this.showMessage("La Daga ya cobró su única herida.", 1600);
-      if (this.hp <= 1) return this.rejectPurchase("La Daga no toma la última vida.");
-      const reward = daggerReward(this.worldNumber);
-      this.hp -= 1; this.coins += reward; this.sacrificeDaggerUsed = true;
-      this.showMessage(`Daga de Sacrificio: una vida se convierte en ${reward} monedas.`, 2100);
-    } else if (offer.key === "credit") {
-      if (this.creditPact) return this.showMessage("La deuda ya conoce tu nombre.", 1700);
-      const credit = Math.round(100 * inflationMultiplier(this.worldNumber));
-      this.creditPact = true;
-      this.debtMass = 1.1;
-      this.maxHp = Math.max(1, this.maxHp - 1);
-      this.hp = Math.min(this.hp, this.maxHp);
-      this.coins += credit;
-      this.physics.world.gravity.y = Math.round(BASE_GRAVITY * gravityMultiplier(this.meta) * this.debtMass);
-      this.spawnDebtCreditor();
-      this.showMessage(`Pacto firmado: +${credit} oro, -1 HP máximo y +10% peso de deuda.`, 3000);
-    }
-    this.blue.explode(18, this.generated.merchant.x, this.generated.merchant.y);
-    AUDIO.buy();
-  }
+  buyMerchantItem(time) { return Mercader.buyMerchantItem(this, time); }
 
-  rejectPurchase(message) {
-    this.showMessage(message, 1600); AUDIO.reject();
-  }
+  rejectPurchase(message) { return Mercader.rejectPurchase(this, message); }
 
-  useSpecialRoom(room, time) {
-    if (room.used) return this.showMessage("La sala ya pronunció su única respuesta.", 1600);
-    if (room.type === "barter") {
-      if (this.coins >= 8 && this.hp < this.maxHp) {
-        this.coins -= 8; this.hp = Math.min(this.maxHp, this.hp + 2);
-        this.showMessage("Trueque: 8 monedas por 2 vidas.", 2000);
-      } else if (this.hp > 2) {
-        this.hp -= 2; this.runFragments += 3; setRunFragmentBank(this.runFragments);
-        this.showMessage("Trueque: 2 vidas por 3 fragmentos de conciencia.", 2200);
-      } else return this.rejectPurchase("El altar pide 8 monedas y una herida abierta, o más de 2 vidas.");
-    } else {
-      if (this.rng() < 0.5) {
-        this.invulnUntil = Math.max(this.invulnUntil, time + 8000);
-        this.riskInvulnerableUntil = time + 8000;
-        this.showMessage("El Pozo concede 8 s de invulnerabilidad y toma la mitad de tu visión.", 2400);
-      } else {
-        this.riskJumpUntil = time + 12000;
-        this.showMessage("El Pozo potencia tu salto durante 12 s y toma la mitad de tu visión.", 2400);
-      }
-      this.riskFog = true;
-      this.doubtUntil = Math.max(this.doubtUntil, time + 3500);
-    }
-    room.used = true;
-    this.blue.explode(28, room.x, room.y);
-    AUDIO.altar();
-  }
+  useSpecialRoom(room, time) { return Mercader.useSpecialRoom(this, room, time); }
 
   sacrificeForRoute(route, useLife = false) {
     if (route.unlocked) {
