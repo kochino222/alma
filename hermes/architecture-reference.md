@@ -35,10 +35,11 @@ Este archivo consolida los documentos clave de arquitectura para consultas rápi
 
 ### 4. plan-refactor.md — Estado del refactor
 - **Fase 0 ✅**: Tag `pre-refactor-2026-09-09`
-- **Fase 1 ✅**: ES Modules, juego.js 4816 líneas (sin partir)
-- **Fase 2 ⬜**: Extraer bloques fáciles a `src/` (delegable a modelo barato)
-- **Fase 3 ⬜**: Partir GameScene (2666 líneas → 10 módulos de sistema ~300-400 líneas final)
-- **Fase 4 ⬜**: Cierre docs
+- **Fase 1 ✅**: ES Modules, juego.js 4837→102 líneas
+- **Fase 2 ✅**: Extraer bloques a `src/` — 14 módulos (core, audio, escenas, mundo, entidades, controles)
+- **Fase 3 ✅**: Partir GameScene 2702→407 → 11 módulos en `src/sistemas/` (patrón fachada + funciones `(scene, ...)`)
+- **Fase 4 ⬜**: Cierre docs (GDD/ART_BIBLE, revisar CODIGO_OPTIMIZADO.js, consolidar ramas)
+- Detalle Fase 3: `hermes/plan-fase3-gamescene.md`
 
 ### 5. verificar.html — Verificador automático
 - Carga juego real + self-test (48 mapas)
@@ -57,6 +58,21 @@ Este archivo consolida los documentos clave de arquitectura para consultas rápi
 - Badge versión (long-press 500ms)
 - Controles: física, recursos, flags, leyes, acciones
 - Persiste en `localStorage.devPanelParams`
+
+### 8. src/sistemas/ — Módulos de sistema (Fase 3)
+- `GameScene.js` (407 líneas) = orquestador: `create`/`update`/`setupCollisions` + 79 fachadas de una línea que delegan.
+- Cada módulo exporta funciones puras `function(scene, ...)`. Módulos (líneas):
+  - `mercader.js` (119) — mercader, ofertas, compra, salas especiales
+  - `destructibles.js` (96) — macetas/cajas/muros, impulso destructivo
+  - `manos.js` (209) — acarreo de objetos + callbacks de colisión portables/rocas
+  - `hud.js` (161) — HUD, layout, `showMessage`
+  - `altar.js` (93) — altar/dios, negociación, sacrificio
+  - `progresion.js` (245) — muerte, descenso, escena Astral
+  - `combate.js` (197) — ataques simbólicos, daño, absorción
+  - `mundo-dinamica.js` (211) — bombas, lava, iluminación, terreno, recolección
+  - `interaccion.js` (122) — interacciones genéricas, salvaguardas de cueva
+  - `movimiento.js` (547) — movimiento + animación procedural del jugador
+  - `construccion.js` (521) — construcción de mundo/entidades (lo que `create()` orquesta)
 
 ---
 
@@ -89,9 +105,13 @@ Ejemplos de cuándo consultar:
 | `ART_BIBLE.md` | 1 | 2026-09-09 |
 | `ANIMATION_POLISH_SUMMARY.md` | 2 | 2026-09-09 |
 | `GDD.md` | 3 | 2026-09-09 |
-| `hermes/plan-refactor.md` | 4 | 2026-09-10 |
+| `hermes/plan-refactor.md` | 4 | 2026-09-11 |
+| `hermes/plan-fase3-gamescene.md` | 4 (Fase 3) | 2026-09-11 |
 | `hermes/verificar.html` | 5 | 2026-09-10 |
+| `hermes/verificar-gamescene.html` | 5 (GameScene) | 2026-09-10 |
 | `art_data.js` | 6 | 2026-09-10 |
 | `devpanel.js` | 7 | 2026-09-10 |
-| `juego.js` | (GameScene) | 2026-09-10 |
+| `src/escenas/GameScene.js` | 8 | 2026-09-11 |
+| `src/sistemas/*.js` (11 módulos) | 8 | 2026-09-11 |
+| `juego.js` | (entry point) | 2026-09-10 |
 | `index.html` | (entry point) | 2026-09-10 |
