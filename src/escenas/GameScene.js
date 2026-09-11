@@ -18,6 +18,7 @@ import { SymbolicEntity } from "../entidades/SymbolicEntity.js";
 import { ControlRig } from "../controles/ControlRig.js";
 
 import * as Mercader from "../sistemas/mercader.js";
+import * as Destructibles from "../sistemas/destructibles.js";
 const Between = Phaser.Math.Between;
 
 export class GameScene extends Phaser.Scene {
@@ -1679,45 +1680,9 @@ export class GameScene extends Phaser.Scene {
     this.showMessage("El objeto cubre los filos y crea un apoyo seguro.", 1700);
   }
 
-  breakPot(pot) {
-    if (!pot?.active) return false;
-    if (this.carried?.target === pot) this.carried = null;
-    const x = pot.x, y = pot.y;
-    pot.disableBody(true, true);
-    this.rubble.explode(12, x, y);
-    const roll = this.rng();
-    if (roll < 0.15) {
-      if (this.rng() < 0.55) { this.bombs += 1; this.showMessage("La vasija ocultaba una bomba.", 1400); }
-      else {
-        const spore = this.sporesGroup.create(x, y - 8, "spore");
-        spore.body.setCircle(12, 2, 2); spore.phase = this.rng() * Math.PI * 2;
-        this.showMessage("Una espora despierta entre la arcilla.", 1400);
-      }
-    } else {
-      const count = randInt(this.rng, 1, 3);
-      for (let i = 0; i < count; i += 1) {
-        const coin = this.coinsGroup.create(x + (i - (count - 1) / 2) * 18, y - 8, "coin");
-        coin.body.setCircle(10, 2, 2); coin.phase = this.rng() * Math.PI * 2;
-      }
-    }
-    AUDIO.noise(0.14, 0.09, 980);
-    return true;
-  }
+  breakPot(pot) { return Destructibles.breakPot(this, pot); }
 
-  seismicLifeStrike(time) {
-    if (this.ending) return;
-    this.hp -= 1;
-    const removed = this.destroyTerrainCircle(this.player.x, this.player.y + 10, 2);
-    this.destructiblesGroup.children.iterate(wall => {
-      if (wall?.active && Math.hypot(wall.x - this.player.x, wall.y - this.player.y) < TILE * 2.2) this.breakWall(wall, true);
-    });
-    this.rubble.explode(30, this.player.x, this.player.y + 12);
-    this.cameras.main.shake(220, 0.011);
-    AUDIO.demolition();
-    this.interactionConsumedUntil = time + 500;
-    this.showMessage(`Golpe sísmico: 1 vida abre ${removed} fragmentos de roca.`, 1900);
-    if (this.hp <= 0) this.die();
-  }
+  seismicLifeStrike(time) { return Destructibles.seismicLifeStrike(this, time); }
 
   hasVerticalEscape() {
     if (!this.terrain || !this.player?.body) return true;
@@ -1968,18 +1933,7 @@ export class GameScene extends Phaser.Scene {
     return removed;
   }
 
-  breakCrate(crate) {
-    if (!crate?.active) return false;
-    if (this.carried?.target === crate) this.carried = null;
-    const x = crate.x, y = crate.y;
-    crate.disableBody(true, true);
-    this.rubble.explode(8, x, y);
-    if (this.rng() < 0.35) {
-      this.bombs += 1;
-      this.showMessage("La caja escondía una bomba.", 1400);
-    }
-    return true;
-  }
+  breakCrate(crate) { return Destructibles.breakCrate(this, crate); }
 
   updateWorldDynamics(time, dt) {
     if (this.ending) return;
@@ -2221,42 +2175,11 @@ export class GameScene extends Phaser.Scene {
     if (force >= 210) this.breakCrate(crate);
   }
 
-  crackWall(rock, wall) {
-    if (this.ending) return;
-    if (!wall.active) return;
-    if (Math.abs(rock.body.velocity.x) + Math.abs(rock.body.velocity.y) > 180 || this.godPowerTimer > 0) {
-      this.breakWall(wall);
-    }
-  }
+  crackWall(rock, wall) { return Destructibles.crackWall(this, rock, wall); }
 
-  breakWall(wall, force = false) {
-    if (!wall || !wall.active) return false;
-    if (!force && wall.dramaticId && !this.generated.dramaticRoutes.find(r => r.id === wall.dramaticId)?.unlocked) return false;
-    this.spark.explode(18, wall.x, wall.y);
-    wall.disableBody(true, true);
-    AUDIO.noise(0.12, 0.12, 650);
-    return true;
-  }
+  breakWall(wall, force = false) { return Destructibles.breakWall(this, wall, force); }
 
-  destructiveImpulse(time) {
-    if (this.hp <= 1) {
-      this.showMessage("Solo queda una vida. El ego no encuentra crédito.", 1700);
-      AUDIO.reject();
-      return;
-    }
-    this.hp -= 1;
-    let broken = 0;
-    this.destructiblesGroup.children.iterate(wall => {
-      if (wall && wall.active && Phaser.Math.Distance.Between(this.player.x, this.player.y, wall.x, wall.y) < 135) {
-        if (this.breakWall(wall)) broken += 1;
-      }
-    });
-    this.cameras.main.shake(170, 0.008);
-    this.spark.explode(36, this.player.x, this.player.y);
-    this.destroyTerrainCircle(this.player.x, this.player.y, 2.1);
-    AUDIO.dash();
-    this.showMessage(broken ? "Entregás algo de vos y el mundo se abre." : "El poder florece sin un objeto.", 1900);
-  }
+  destructiveImpulse(time) { return Destructibles.destructiveImpulse(this, time); }
 
   useAltar() {
     const price = inflatedPrice(this.worldNumber);
