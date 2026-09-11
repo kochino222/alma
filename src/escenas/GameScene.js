@@ -23,6 +23,7 @@ import * as Manos from "../sistemas/manos.js";
 import * as Hud from "../sistemas/hud.js";
 import * as Altar from "../sistemas/altar.js";
 import * as Progresion from "../sistemas/progresion.js";
+import * as Combate from "../sistemas/combate.js";
 const Between = Phaser.Math.Between;
 
 export class GameScene extends Phaser.Scene {
@@ -1283,74 +1284,11 @@ export class GameScene extends Phaser.Scene {
     body.setSize(20 / sx, 35 / sy).setOffset(6 / sx, 10 / sy);
   }
 
-  spawnSymbolicAttack(owner, type, x, y, vx, vy, duration) {
-    if (this.ending) return;
-    const graphics = this.add.graphics().setDepth(12);
-    this.symbolicAttacks.push({ owner, type, x, y, vx, vy, born: this.time.now,
-      expires: this.time.now + duration, hit: false, gravity: type === "coinRain" ? 260 : 0, graphics });
-  }
+  spawnSymbolicAttack(owner, type, x, y, vx, vy, duration) { return Combate.spawnSymbolicAttack(this, owner, type, x, y, vx, vy, duration); }
 
-  parryAttack(owner, time, attack = null) {
-    if (attack) {
-      attack.graphics.destroy();
-      attack.dead = true;
-    }
-    owner.stunnedUntil = Math.max(owner.stunnedUntil, time + 1500);
-    owner.windupUntil = 0; owner.attackAt = 0; owner.chargeUntil = 0;
-    this.dashReadyAt = Math.min(this.dashReadyAt, time + 360);
-    this.blue.explode(18, this.player.x, this.player.y);
-    this.showMessage("Parry simbólico: ataque disipado; pensamiento aturdido.", 1700);
-    AUDIO.dash();
-  }
+  parryAttack(owner, time, attack = null) { return Combate.parryAttack(this, owner, time, attack); }
 
-  updateSymbolicAttacks(time, dt) {
-    if (this.ending) return;
-    if (!this.symbolicAttacks) this.symbolicAttacks = [];
-    const playerRect = this.player.body;
-    for (const attack of this.symbolicAttacks) {
-      if (this.ending) return;
-      if (attack.dead) continue;
-      attack.x += attack.vx * dt / 1000;
-      attack.y += attack.vy * dt / 1000;
-      attack.vy += (attack.gravity || 0) * dt / 1000;
-      attack.graphics.clear();
-      const rect = attack.type === "pillar"
-        ? makeRect(attack.x - 18, attack.y - 250, 36, 500)
-        : attack.type === "lasso" ? makeRect(attack.x - 15, attack.y - 9, 30, 18)
-        : makeRect(attack.x - 7, attack.y - 7, 14, 14);
-      if (attack.type === "pillar") {
-        attack.graphics.fillStyle(0xff5b32, 0.72).fillRect(rect.x, rect.y, rect.width, rect.height);
-        attack.graphics.fillStyle(0xffd45e, 0.85).fillRect(attack.x - 5, rect.y, 10, rect.height);
-      } else if (attack.type === "lasso") {
-        attack.graphics.lineStyle(2, 0xffce66, 0.78);
-        attack.graphics.lineBetween(attack.owner.x, attack.owner.y - 8, attack.x, attack.y);
-        attack.graphics.strokeCircle(attack.x, attack.y, 13);
-      } else {
-        attack.graphics.fillStyle(0xffce66, 0.95).fillCircle(attack.x, attack.y, 7);
-      }
-      if (rectsOverlap(playerRect, rect)) {
-        if (time < this.dashUntil) this.parryAttack(attack.owner, time, attack);
-        else if (attack.type === "lasso") {
-          const stolen = Math.min(2, this.coins);
-          this.coins -= stolen;
-          attack.owner.storedCoins += stolen;
-          attack.owner.lassoActiveUntil = 0;
-          attack.hit = true; attack.dead = true; attack.graphics.destroy();
-          this.showMessage(stolen ? `El lazo arrastra ${stolen} monedas hacia El Acreedor.` : "El lazo encuentra tus bolsillos vacíos.", 1600);
-        }
-        else {
-          attack.hit = true; attack.dead = true; attack.graphics.destroy();
-          this.takeDamage(1, "symbolic");
-          if (this.ending) return;
-        }
-      } else if (time >= attack.expires) {
-        attack.dead = true; attack.graphics.destroy();
-        if (attack.type === "lasso") attack.owner.lassoActiveUntil = 0;
-        if (!attack.hit && attack.owner.state === "active") attack.owner.stunnedUntil = Math.max(attack.owner.stunnedUntil, time + 1500);
-      }
-    }
-    this.symbolicAttacks = this.symbolicAttacks.filter(attack => !attack.dead);
-  }
+  updateSymbolicAttacks(time, dt) { return Combate.updateSymbolicAttacks(this, time, dt); }
 
   handleLadders(controls) {
     this.onLadder = this.ladderZones.some(zone => this.physics.overlap(this.player, zone));
@@ -1521,81 +1459,9 @@ export class GameScene extends Phaser.Scene {
 
   surrenderToAstral(reason) { return Progresion.surrenderToAstral(this, reason); }
 
-  updateProximity() {
-    // Requerimiento #2: si el juego ya está acabando, ocultá el prompt de
-    // proximidad al instante y NO evalúes distancias contra un jugador muerto.
-    if (this.ending) {
-      this.promptText?.setText("").setVisible(false);
-      return;
-    }
-    this.nearSymbolic = (this.symbolicEntities || []).filter(entity => entity.state === "active" &&
-      Math.hypot(this.player.x - entity.x, this.player.y - entity.y) < 76)
-      .sort((a, b) => Math.hypot(this.player.x - a.x, this.player.y - a.y) - Math.hypot(this.player.x - b.x, this.player.y - b.y))[0] || null;
-    this.nearStunned = (this.symbolicEntities || []).filter(entity => entity.state === "active" && entity.stunnedUntil > this.time.now &&
-      Math.hypot(this.player.x - entity.x, this.player.y - entity.y) < 65)
-      .sort((a, b) => Math.hypot(this.player.x - a.x, this.player.y - a.y) - Math.hypot(this.player.x - b.x, this.player.y - b.y))[0] || null;
-    this.nearPortable = this.nearStunned ? { type: "symbolic", target: this.nearStunned, distance: Math.hypot(this.player.x - this.nearStunned.x, this.player.y - this.nearStunned.y) } : this.nearbyPortable(false);
-    this.portableHalo?.clear();
-    if (this.nearPortable) {
-      const object = this.nearPortable.target;
-      this.portableHalo?.lineStyle(1.5, 0x8af0b0, 0.38);
-      this.portableHalo?.strokeCircle(object.x, object.y, 26 + Math.sin(this.time.now * 0.008) * 3);
-    }
-    this.nearExit = this.physics.overlap(this.player, this.exitDoor);
-    this.nearMerchant = Boolean(this.generated.merchant &&
-      Math.hypot(this.player.x - this.generated.merchant.x, this.player.y - this.generated.merchant.y) < 92);
-    this.nearSpecial = this.generated.specialRooms.find(room =>
-      Math.hypot(this.player.x - room.x, this.player.y - room.y) < 92) || null;
-    this.nearAltar = null;
-    this.altarsGroup.children.iterate(altar => {
-      if (!altar || !altar.active) return;
-      if (Phaser.Math.Distance.Between(this.player.x, this.player.y, altar.x, altar.y) < 80) this.nearAltar = altar;
-    });
-    // La fuente de salud mana un flujo sutil de agua mientras el Alma está cerca
-    if (this.altarWater) {
-      if (this.nearAltar) {
-        this.altarWater.x = this.nearAltar.x;
-        this.altarWater.y = this.nearAltar.y - 8;
-        this.altarWater.emitting = true;
-      } else {
-        this.altarWater.emitting = false;
-      }
-    }
-    this.nearGod = Boolean(this.godZone && this.physics.overlap(this.player, this.godZone));
-    this.nearDramatic = this.generated.dramaticRoutes.find(r =>
-      !r.collected && Math.abs(this.player.x - r.x) < 110 && Math.abs(this.player.y - r.y) < 80) || null;
-    if (this.nearDramatic && !this.nearDramatic.unlocked && this.warnedDramaticId !== this.nearDramatic.id) {
-      this.warnedDramaticId = this.nearDramatic.id;
-      this.showMessage("RUTA DRAMÁTICA: el salto común no alcanza. E: ofrecer tu oro (o 1 vida).", 3800);
-    }
-  }
+  updateProximity() { return Combate.updateProximity(this); }
 
-  absorbSymbolic(entity, time) {
-    if (entity.state !== "active" || Math.hypot(this.player.x - entity.x, this.player.y - entity.y) >= 76) return false;
-    if (!entity.vulnerable(time)) {
-      this.showMessage(`${entity.names[entity.kind]} está alerta. Esperá el halo verde o acercate por detrás.`, 2000);
-      return false;
-    }
-    if (this.coins < 3 && this.hp <= 1) {
-      this.showMessage("Absorber exige 3 monedas o una vida que puedas entregar.", 2000);
-      AUDIO.reject();
-      return false;
-    }
-    const price = this.coins >= 3 ? "3 monedas" : "1 vida";
-    if (!entity.dissipate(time, true)) return false;
-    if (this.coins >= 3) this.coins -= 3;
-    else this.hp -= 1;
-    this.absorptionUntil = time + 8000;
-    this.doubtUntil = 0;
-    this.perceptionTimer = 0;
-    this.inverted = false;
-    this.riskFog = false;
-    this.localGravityUntil = 0;
-    this.nearSymbolic = null;
-    AUDIO.fragment();
-    this.showMessage(`Certidumbre absorbida: -${price}. Velocidad y salto aumentados durante 8 s.`, 2600);
-    return true;
-  }
+  absorbSymbolic(entity, time) { return Combate.absorbSymbolic(this, entity, time); }
 
   cycleMerchant() { return Mercader.cycleMerchant(this); }
 
@@ -1837,51 +1703,7 @@ export class GameScene extends Phaser.Scene {
 
   absorbGodPower(time) { return Altar.absorbGodPower(this, time); }
 
-  takeDamage(amount, source) {
-    // Requerimiento #1: primerísima línea. Blinda contra daño letal duplicado
-    // y contra colisiones que se evalúan justo al morir (fix al Crash on Death).
-    if (this.ending || this.hp <= 0) return false;
-    const time = this.time.now;
-    if (source !== "abyss" && time < this.invulnUntil) return;
-    if (source !== "abyss" && this.guardianMirror) {
-      this.guardianMirror = false;
-      this.invulnUntil = time + 650;
-      this.blue.explode(22, this.player.x, this.player.y);
-      AUDIO.fragment();
-      this.showMessage("El Espejo Guardián absorbió el impacto.", 1700);
-      return;
-    }
-    if (source !== "abyss" && this.amnesiaReady) {
-      this.amnesiaReady = false;
-      const zoneFragments = Math.max(0, this.runFragments - this.stageFragmentBase);
-      this.runFragments = this.stageFragmentBase + Math.floor(zoneFragments * 0.5);
-      setRunFragmentBank(this.runFragments);
-      this.invulnUntil = time + 650;
-      this.blue.explode(22, this.player.x, this.player.y);
-      AUDIO.fragment();
-      this.showMessage("Amnesia Selectiva: el golpe se olvida junto a la mitad de los fragmentos de zona.", 2300);
-      return;
-    }
-    const scaled = source === "abyss" ? this.hp : source === "heat" ? amount : Math.max(1, Math.round(amount * trapMultiplier(this.meta)));
-    this.hp = Math.max(0, this.hp - scaled);
-    this.lastDamageAt = time;
-    if (this.hp <= 0) {
-      this.die();
-      return;
-    }
-    if (this.ending) return;
-    this.invulnUntil = time + 900;
-    this.player.setTint(0xff5b67);
-    this.time.delayedCall(120, () => {
-      if (this.ending) return;
-      if (this.player?.active) this.player.clearTint();
-    });
-    this.cameras.main.shake(100, 0.005);
-    this.dust.explode(16, this.player.x, this.player.y);
-    AUDIO.hurt();
-    this.showMessage(source === "spikes" ? "El sentido tiene filos." : source === "lava" ? "El poder quema aquello que lo sostiene." : "El mundo responde con fuerza.", 1300);
-    if (this.ending) return;
-  }
+  takeDamage(amount, source) { return Combate.takeDamage(this, amount, source); }
 
   checkDeathPlane() { return Progresion.checkDeathPlane(this); }
 
