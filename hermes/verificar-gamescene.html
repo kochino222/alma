@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Verificacion GameScene - Alma en Blanco</title>
+  <link rel="stylesheet" href="../estilos.css">
+  <script>
+    window.__errs = [];
+    window.addEventListener("error", e => window.__errs.push("ERROR: " + (e.message || e.type) + " @" + (e.filename || "") + ":" + (e.lineno || "")));
+    window.addEventListener("unhandledrejection", e => window.__errs.push("REJECTION: " + (e.reason && e.reason.message ? e.reason.message : e.reason)));
+  </script>
+</head>
+<body>
+  <div id="game-root">
+    <div class="fallback">Preparando el descenso...</div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+  <script type="module" src="../juego.js"></script>
+
+  <script>
+    // Harness determinista: NO depende del rAF ni de inputs reales.
+    // Arranca GameScene, reemplaza controls.read() por un stub controlado y
+    // llama scene.update() a mano. Asi se verifica la logica extraida a src/.
+    window.addEventListener("load", () => setTimeout(async () => {
+      const out = { pasos: [] };
+      const log = (k, v) => out.pasos.push({ paso: k, ok: v });
+      const frames = (scene, n, ctrl, stepMs = 16) => {
+        for (let i = 0; i < n; i += 1) {
+          scene.__ctrl = Object.assign({
+            left: false, right: false, up: false, down: false, axis: 0,
+            jump: false, jumpPressed: false, jumpReleased: false,
+            interact: false, interactPressed: false, interactReleased: false,
+            attack: false, attackPressed: false, bomb: false, bombPressed: false,
+            facing: 1
+          }, typeof ctrl === "function" ? ctrl(i) : ctrl);
+          const t = scene.time.now + i * stepMs;
+          scene.update(t, stepMs);
+          // Pisar la fisica a mano: en headless el loop de Phaser esta throttled.
+          scene.physics.world.update(t, stepMs);
+          scene.physics.world.postUpdate();
+        }
+      };
+      try {
+        const game = window.__BLANK_SOUL_GAME__;
+        out.instancia = !!game;
+        if (!game) throw new Error("sin instancia de juego");
+
+        game.scene.stop("Menu");
+        await new Promise(r => setTimeout(r, 200));
+        game.scene.start("Game", { level: 1, seed: "verif-gamescene", runId: "verif-run", coins: 0, fragments: 0, hp: 5, isCustomSeed: false });
+        await new Promise(r => setTimeout(r, 1200));
+
+        const scene = game.scene.getScene("Game");
+        if (!scene) throw new Error("GameScene no se creo");
+        log("GameScene activa", scene.scene.isActive());
+
+        // --- Estructuras esperadas del refactor ---
+        const checks = {
+          terrain: !!scene.terrain,
+          player: !!scene.player,
+          playerRig: !!scene.playerRig,
+          rigParts: !!scene.rigParts && ["head","torso","backArm","backLeg","frontArm","frontLeg"].every(k => !!scene.rigParts[k]),
+          mapa: !!scene.generated && scene.generated.path?.length > 0,
+          pathLen: scene.generated?.path?.length ?? -1,
+          symbolics: scene.symbolicEntities?.length ?? -1,
+          groups: ["coinsGroup","fragmentsGroup","cratesGroup","bouldersGroup","potsGroup","bombsGroup","sporesGroup","destructiblesGroup","altarsGroup","spikesGroup"].every(k => !!scene[k]),
+          hud: !!scene.hudText && !!scene.promptText && !!scene.lawText,
+          darkness: !!scene.darkness && !!scene.lightGlow,
+          controls: !!scene.controls && typeof scene.controls.read === "function",
+          follow: !!scene.cameras.main._follow,
+          lerp: scene.cameras.main.lerp ? [scene.cameras.main.lerp.x, scene.cameras.main.lerp.y] : null,
+          deadzone: scene.cameras.main.deadzone ? [scene.cameras.main.deadzone.width, scene.cameras.main.deadzone.height] : null,
+          levelInfo: scene.levelInfo?.key,
+          mergeMerchant: !!scene.generated?.merchant,
+          specialRooms: scene.generated?.specialRooms?.length ?? -1
+        };
+        out.checks = checks;
+        log("terrain+player+rig", checks.terrain && checks.player && checks.playerRig && checks.rigParts);
+        log("mapa procedural", checks.mapa);
+        log("grupos fisica (10)", checks.groups);
+        log("HUD + iluminacion", checks.hud && checks.darkness);
+        log("ControlRig", checks.controls);
+        log("camara sigue jugador", checks.follow);
+        log("camara lerp 0.2/0.15", Array.isArray(checks.lerp) && checks.lerp[0] === 0.2 && checks.lerp[1] === 0.15);
+        log("deadzone 120x80", Array.isArray(checks.deadzone) && checks.deadzone[0] === 120 && checks.deadzone[1] === 80);
+        log("enemigos simbolicos", checks.symbolics === 3);
+
+        // --- Stub de controles: sin BLUR ni rAF de por medio ---
+        scene.controls.read = () => scene.__ctrl;
+        scene.__ctrl = { axis: 0 };
+
+        // 1) Movimiento horizontal
+        const x0 = scene.player.x;
+        frames(scene, 90, { axis: 1, right: true, facing: 1 });
+        const x1 = scene.player.x;
+        out.movX = { antes: Math.round(x0), despues: Math.round(x1) };
+        log("avanza a la derecha", x1 > x0 + 20);
+
+        // 2) Salto (coyote + buffer)
+        const y0 = scene.player.y;
+        scene.lastGroundedAt = scene.time.now;
+        frames(scene, 1, { axis: 0, jump: true, jumpPressed: true, facing: 1 });
+        scene.__ctrl.jumpPressed = false;
+        frames(scene, 6, { axis: 0, jump: true, facing: 1 });
+        const y1 = scene.player.y;
+        out.salto = { antes: Math.round(y0), despues: Math.round(y1), vy: Math.round(scene.player.body.velocity.y) };
+        log("salta (y disminuye)", y1 < y0 - 4);
+
+        // 3) Aterrizaje + animacion idle
+        frames(scene, 140, { axis: 0 });
+        log("vuelve al suelo", Boolean(scene.player.body.blocked.down || scene.player.body.touching.down || scene.onSlope));
+
+        // 4) Dash
+        const dashBefore = scene.dashUntil;
+        scene.dashReadyAt = 0;
+        frames(scene, 1, { axis: 0, attack: true, attackPressed: true, facing: 1 });
+        log("dash activa (dashUntil)", scene.dashUntil > dashBefore);
+        frames(scene, 30, { axis: 0 });
+
+        // 5) Monedas: recoger una real del mapa
+        const coinCount = scene.coinsGroup.children.size;
+        const coin = scene.coinsGroup.getFirstAlive();
+        let coinsOk = "sin monedas";
+        if (coin) {
+          const cBefore = scene.coins;
+          scene.player.x = coin.x; scene.player.y = coin.y;
+          await new Promise(r => setTimeout(r, 250));
+          coinsOk = scene.coins > cBefore;
+        }
+        out.monedas = { enMapa: coinCount, recogida: coinsOk };
+        log("recoger moneda", coinsOk === true);
+
+        // 6) Daño + invulnerabilidad
+        const hpBefore = scene.hp;
+        scene.invulnUntil = 0;
+        scene.takeDamage(1, "test");
+        log("daño resta HP", scene.hp === hpBefore - 1);
+        scene.takeDamage(1, "test");
+        log("invulnerabilidad bloquea 2do golpe", scene.hp === hpBefore - 1);
+
+        // 7) Bomba: desplegar + destruccion de terreno
+        try {
+          const bBefore = scene.bombs;
+          scene.player.facing = 1;
+          scene.deployBomb(scene.time.now);
+          const bomb = scene.bombsGroup.getFirstAlive();
+          const removed = scene.destroyTerrainCircle(bomb.x, bomb.y, 2.65);
+          out.bomba = { desplegada: scene.bombs === bBefore - 1, tilesRemovidos: removed };
+          log("bomba desplegada", scene.bombs === bBefore - 1);
+          log("bomba destruye terreno", removed > 0);
+        } catch (e) { log("bomba", String(e)); }
+
+        // 8) Leyes: cruce con guardado.js
+        try {
+          const { economyMultiplier } = await import("../src/core/guardado.js");
+          scene.meta.economyGrace = 1;
+          scene.meta.activeEconomyGrace = 1;
+          out.leyEconomia = economyMultiplier(scene.meta);
+          log("ley Aligerar Oro (0.72)", out.leyEconomia === 0.72);
+          scene.meta.economyGrace = 0;
+        } catch (e) { log("ley economia", String(e)); }
+
+        // 9) Descenso de nivel (spy sobre scene.start: en headless el loop no procesa el restart)
+        try {
+          const lvl = scene.levelNumber;
+          const fragsBefore = scene.runFragments;
+          scene.usedExit = false;
+          let started = null;
+          const realStart = scene.scene.start.bind(scene.scene);
+          const realDelayed = scene.time.delayedCall;
+          scene.scene.start = (key, data) => { started = { key, data }; };
+          scene.time.delayedCall = (ms, fn) => { fn(); }; // ejecutar el fade-out inline
+          scene.descend();
+          scene.scene.start = realStart;
+          scene.time.delayedCall = realDelayed;
+          out.descenso = { desde: lvl, hacia: started?.data?.level ?? null, key: started?.key ?? null,
+            fragmentos: [fragsBefore, scene.runFragments], usedExit: scene.usedExit };
+          log("descenso pide Game nivel+1", started?.key === "Game" && started?.data?.level === lvl + 1);
+          log("descenso suma 1 fragmento", scene.runFragments === fragsBefore + 1);
+        } catch (e) { log("descenso", String(e)); }
+
+        // 8) Mercader en nivel X-2 (donde SI existe) + cruce con inflacion
+        try {
+          game.scene.start("Game", { level: 2, seed: "verif-merchant", runId: "verif-run2", coins: 0, fragments: 0, hp: 5, isCustomSeed: false });
+          await new Promise(r => setTimeout(r, 900));
+          const s2 = game.scene.getScene("Game");
+          out.nivel2 = { level: s2.levelNumber, substage: s2.substage, merchant: !!s2.generated.merchant };
+          log("nivel 2-2 tiene mercader", !!s2.generated.merchant);
+          s2.controls.read = () => s2.__ctrl;
+          s2.__ctrl = { axis: 0 };
+          const offers = s2.merchantOffers();
+          out.ofertasMercader = offers.length;
+          s2.coins = 999;
+          s2.merchantSelection = 5; // paquete de 3 bombas
+          const bBefore = s2.bombs;
+          const cBefore = s2.coins;
+          s2.buyMerchantItem(s2.time.now);
+          out.bombas = { antes: bBefore, despues: s2.bombs, oro: [cBefore, s2.coins] };
+          log("mercader vende bombas", s2.bombs === bBefore + 3);
+          // Precio = inflatedPrice(worldNumber). Nivel 2 => mundo 1 => 1.0x => 20.
+          const { inflatedPrice } = await import("../src/core/guardado.js");
+          const esperado = inflatedPrice(s2.worldNumber);
+          out.precio = { cobrado: cBefore - s2.coins, esperado, mundo: s2.worldNumber };
+          log("mercader cobra precio del mundo", cBefore - s2.coins === esperado);
+        } catch (e) { log("mercader", String(e)); }
+
+        out.errores = window.__errs;
+      } catch (e) {
+        out.excepcion = String(e && e.stack ? e.stack : e);
+      }
+      const pre = document.createElement("pre");
+      pre.id = "verificacion";
+      pre.textContent = JSON.stringify(out, null, 1);
+      document.body.appendChild(pre);
+      const errs = out.errores && out.errores.length;
+      const failed = out.pasos.filter(p => p.ok !== true);
+      document.title = out.excepcion ? "FALLO - excepcion" : errs ? "FALLO - " + errs + " errores" : (failed.length ? "FALLO - " + failed.length + " pasos" : "OK");
+    }, 2500));
+  </script>
+</body>
+</html>
