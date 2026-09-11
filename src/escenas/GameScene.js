@@ -19,6 +19,7 @@ import { ControlRig } from "../controles/ControlRig.js";
 
 import * as Mercader from "../sistemas/mercader.js";
 import * as Destructibles from "../sistemas/destructibles.js";
+import * as Manos from "../sistemas/manos.js";
 const Between = Phaser.Math.Between;
 
 export class GameScene extends Phaser.Scene {
@@ -1508,177 +1509,21 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  nearbyPortable(includeSymbolic = true) {
-    const candidates = [];
-    const addGroup = (group, type) => group?.children?.iterate(object => {
-      if (!object?.active || object === this.carried?.target) return;
-      const distance = Math.hypot(this.player.x - object.x, this.player.y - object.y);
-      if (distance < 62) candidates.push({ type, target: object, distance });
-    });
-    addGroup(this.cratesGroup, "crate");
-    addGroup(this.bouldersGroup, "boulder");
-    addGroup(this.potsGroup, "pot");
-    addGroup(this.bombsGroup, "bomb");
-    for (const entity of includeSymbolic ? (this.symbolicEntities || []) : []) {
-      if (entity.state !== "active" || !entity.vulnerable(this.time.now)) continue;
-      const distance = Math.hypot(this.player.x - entity.x, this.player.y - entity.y);
-      if (distance < 68) candidates.push({ type: "symbolic", target: entity, distance });
-    }
-    return candidates.sort((a, b) => a.distance - b.distance)[0] || null;
-  }
+  nearbyPortable(includeSymbolic = true) { return Manos.nearbyPortable(this, includeSymbolic); }
 
-  tryPickupNearby(time, includeSymbolic = true) {
-    if (this.ending || this.carried) return false;
-    const portable = this.nearbyPortable(includeSymbolic);
-    if (!portable) return false;
-    const { target, type } = portable;
-    if (type !== "symbolic" && (!target?.active || !target?.body)) return false;
-    this.carried = { target, type };
-    if (type === "symbolic") {
-      target.state = "carried";
-      target.ring.clear();
-    } else {
-      target.body.stop();
-      target.body.enable = false;
-      target.setAngularVelocity?.(0);
-      if (type === "boulder") target.sleepingStone = false;
-    }
-    target.thrownByPlayer = false;
-    this.interactionConsumedUntil = time + 320;
-    this.actionHoldStartedAt = 0;
-    this.blue.explode(8, this.player.x, this.player.y - 26);
-    AUDIO.tone(245, 0.08, "square", 0.045, 80);
-    this.showMessage(type === "symbolic" ? "La idea aturdida pesa menos sobre los hombros." : "Objeto levantado. »: lanzar · Abajo+»: depositar.", 1800);
-    return true;
-  }
+  tryPickupNearby(time, includeSymbolic = true) { return Manos.tryPickupNearby(this, time, includeSymbolic); }
 
-  updateHandsRig(controls, time, dt) {
-    if (this.ending) return;
-    if (this.carried) {
-      const { target, type } = this.carried;
-      if (!target || (type === "symbolic" && !target.sprite) || (type !== "symbolic" && !target.active)) { this.carried = null; return; }
-      const x = this.player.x, y = this.player.y - 28;
-      if (type === "symbolic") {
-        target.x = x; target.y = y; target.sprite.setPosition(x, y).setVisible(true).setAngle(Math.sin(time * 0.008) * 4);
-      } else target.setPosition(x, y).setAngle(Math.sin(time * 0.009) * 5);
-      return;
-    }
-    const gravity = this.physics.world.gravity.y;
-    for (const thrown of this.thrownEntities || []) {
-      const entity = thrown.target;
-      if (!entity || entity.state !== "thrown") { thrown.dead = true; continue; }
-      // Guarda anti-crash: si el sprite/referencia fue anulado, descartar el lanzamiento.
-      if (!entity.sprite || !entity.sprite.active) { thrown.dead = true; continue; }
-      try {
-        thrown.vy += gravity * dt / 1000;
-        entity.x += thrown.vx * dt / 1000;
-        entity.y += thrown.vy * dt / 1000;
-        entity.sprite.setPosition(entity.x, entity.y).setAngle(entity.sprite.angle + thrown.vx * dt * 0.0012);
-        const tile = this.terrain.getTileAtWorldXY(entity.x, entity.y + 15, true);
-        let hitOther = false;
-        for (const other of this.symbolicEntities || []) {
-          if (other === entity || other.state !== "active") continue;
-          if (Math.hypot(other.x - entity.x, other.y - entity.y) < 34) {
-            other.dissipate(time); hitOther = true; break;
-          }
-        }
-        if (hitOther || tile?.index === 1 || time >= thrown.expires) {
-          entity.state = "dissipated"; entity.respawnAt = time + 8000; entity.sprite.setVisible(false);
-          this.blue.explode(16, entity.x, entity.y); thrown.dead = true;
-        }
-      } catch (err) {
-        thrown.dead = true;
-      }
-    }
-    this.thrownEntities = (this.thrownEntities || []).filter(item => !item.dead);
+  updateHandsRig(controls, time, dt) { return Manos.updateHandsRig(this, controls, time, dt); }
 
-    for (const group of [this.cratesGroup, this.bouldersGroup, this.potsGroup, this.bombsGroup]) group?.children?.iterate(object => {
-      if (!object?.active || !object.body?.enable) return;
-      object.impactSpeed = Math.max(object.impactSpeed || 0, Math.hypot(object.body.velocity.x, object.body.velocity.y));
-      if (!object.thrownByPlayer) return;
-      for (const entity of this.symbolicEntities || []) {
-        if (entity.state !== "active" || Math.hypot(entity.x - object.x, entity.y - object.y) >= 38) continue;
-        if (object.pickupType === "pot") this.breakPot(object);
-        entity.stunnedUntil = Math.max(entity.stunnedUntil, time + 1500);
-        entity.windupUntil = 0; entity.attackAt = 0; entity.chargeUntil = 0;
-        this.blue.explode(10, entity.x, entity.y);
-        object.thrownByPlayer = false;
-        this.showMessage("El pensamiento queda aturdido por el peso de lo real.", 1500);
-        break;
-      }
-    });
-  }
+  releaseCarried(soft, time) { return Manos.releaseCarried(this, soft, time); }
 
-  releaseCarried(soft, time) {
-    if (!this.carried || !this.carried.target) return false;
-    const carried = this.carried;
-    const dir = this.player.facing || 1;
-    // Limpiar referencias y estado visual (aura verde del portaobjetos) antes de
-    // que el objeto vuelva a entrar en las físicas activas del mundo.
-    this.carried = null;
-    this.portableHalo?.clear();
-    if (carried.type === "symbolic") {
-      const entity = carried.target;
-      if (!entity?.sprite) return false;
-      try {
-        entity.state = "thrown";
-        entity.ring?.clear();
-        entity.sprite.setVisible(true);
-        this.thrownEntities = this.thrownEntities || [];
-        this.thrownEntities.push({ target: entity, vx: soft ? 0 : dir * 320, vy: soft ? 20 : -140, expires: time + 2300 });
-      } catch (err) {
-        return false;
-      }
-    } else {
-      const object = carried.target;
-      // Guarda anti-crash: si el objeto o su cuerpo físico ya fueron anulados
-      // (p. ej. una vasija rota), no reintroducirlo en las físicas activas.
-      if (!object || !object.active || !object.body) return false;
-      try {
-        object.body.enable = true;
-        object.body.setMaxVelocity(360, 620);
-        object.setPosition(this.player.x + dir * 22, this.player.y - (soft ? 2 : 20));
-        object.setVelocity(soft ? 0 : dir * 320, soft ? 25 : -140);
-        object.setAngularVelocity?.(soft ? 0 : dir * 460);
-        object.thrownByPlayer = !soft;
-        object.impactSpeed = 0;
-      } catch (err) {
-        return false;
-      }
-    }
-    AUDIO.dash();
-    return true;
-  }
+  dropCarried(time) { return Manos.dropCarried(this, time); }
 
-  dropCarried(time) {
-    if (!this.carried) return false;
-    this.releaseCarried(true, time);
-    this.interactionConsumedUntil = time + 250;
-    return true;
-  }
+  onPortableTerrainHit(object) { return Manos.onPortableTerrainHit(this, object); }
 
-  onPortableTerrainHit(object) {
-    if (this.ending || !object?.active) return;
-    const force = object.impactSpeed || 0;
-    object.impactSpeed = 0;
-    if (object.pickupType === "pot" && force > 130) this.breakPot(object);
-    if (object.thrownByPlayer && force >= 120) object.thrownByPlayer = false;
-  }
+  onPortableWallHit(object) { return Manos.onPortableWallHit(this, object); }
 
-  onPortableWallHit(object) {
-    if (this.ending || !object?.active) return;
-    if (object.pickupType === "pot" && (object.impactSpeed || 0) > 130) this.breakPot(object);
-  }
-
-  onPortableSpikeHit(object, spike) {
-    if (this.ending || !object?.active || !spike?.active) return;
-    spike.disableBody(true, true);
-    object.setVelocityY(Math.min(0, object.body.velocity.y));
-    object.setAngularVelocity?.(0);
-    object.thrownByPlayer = false;
-    this.rubble.explode(7, spike.x, spike.y);
-    this.showMessage("El objeto cubre los filos y crea un apoyo seguro.", 1700);
-  }
+  onPortableSpikeHit(object, spike) { return Manos.onPortableSpikeHit(this, object, spike); }
 
   breakPot(pot) { return Destructibles.breakPot(this, pot); }
 
@@ -2145,35 +1990,13 @@ export class GameScene extends Phaser.Scene {
     this.showMessage("La selva toma prestada tu certeza.", 2100);
   }
 
-  onPushCrate(player, crate) {
-    if (this.ending) return;
-    const pushPower = this.featherBoots ? 1.05 : clamp(1.05 - effectiveCoinBurden(this.coins, this.meta) * 0.0022, 0.55, 1.05);
-    crate.body.velocity.x *= pushPower;
-  }
+  onPushCrate(player, crate) { return Manos.onPushCrate(this, player, crate); }
 
-  onBoulderHit(player, rock) {
-    if (this.ending) return;
-    const force = Math.abs(rock.body.velocity.x) + Math.abs(rock.body.velocity.y);
-    if (force > 145) this.takeDamage(2, "boulder");
-    if (this.ending) return;
-  }
+  onBoulderHit(player, rock) { return Manos.onBoulderHit(this, player, rock); }
 
-  onBoulderTerrainHit(rock, tile) {
-    if (this.ending || !rock?.active || !tile) return;
-    const force = Math.max(rock.impactSpeed || 0, Math.abs(rock.body.velocity.x) + Math.abs(rock.body.velocity.y));
-    if (force < 260 || this.time.now < (rock.terrainBreakReadyAt || 0)) return;
-    rock.terrainBreakReadyAt = this.time.now + 240;
-    rock.impactSpeed = 0;
-    this.destroyTerrainCircle(tile.pixelX + TILE / 2, tile.pixelY + TILE / 2, 0.85);
-    this.rubble.explode(8, tile.pixelX + TILE / 2, tile.pixelY + TILE / 2);
-    AUDIO.demolition();
-  }
+  onBoulderTerrainHit(rock, tile) { return Manos.onBoulderTerrainHit(this, rock, tile); }
 
-  onBoulderCrateHit(rock, crate) {
-    if (this.ending || !crate?.active) return;
-    const force = Math.max(rock.impactSpeed || 0, Math.abs(rock.body.velocity.x) + Math.abs(rock.body.velocity.y));
-    if (force >= 210) this.breakCrate(crate);
-  }
+  onBoulderCrateHit(rock, crate) { return Manos.onBoulderCrateHit(this, rock, crate); }
 
   crackWall(rock, wall) { return Destructibles.crackWall(this, rock, wall); }
 
