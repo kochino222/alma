@@ -20,6 +20,7 @@ import { ControlRig } from "../controles/ControlRig.js";
 import * as Mercader from "../sistemas/mercader.js";
 import * as Destructibles from "../sistemas/destructibles.js";
 import * as Manos from "../sistemas/manos.js";
+import * as Hud from "../sistemas/hud.js";
 const Between = Phaser.Math.Between;
 
 export class GameScene extends Phaser.Scene {
@@ -667,90 +668,9 @@ export class GameScene extends Phaser.Scene {
     this.portableHalo = this.add.graphics().setDepth(18);
   }
 
-  createHud() {
-    const sw = screenW(this);
-    const sh = screenH(this);
-    const hudW = Math.min(468, sw - 24);
-    this.hudBg = this.add.rectangle(12, 12, hudW, 102, 0x04060b, 0.56)
-      .setOrigin(0, 0)
-      .setScrollFactor(0)
-      .setDepth(900);
-    this.hudBg.setStrokeStyle(1, 0x9dfcff, 0.24);
-    this.hudText = this.add.text(24, 20, "", {
-      fontFamily: "monospace",
-      fontSize: `${sw < 520 ? 11 : 14}px`,
-      color: "#eefcff",
-      lineSpacing: sw < 520 ? 2 : 4,
-      wordWrap: { width: hudW - 22 }
-    }).setScrollFactor(0).setDepth(901);
-    this.promptText = this.add.text(sw / 2, sh - 86, "", {
-      fontFamily: "monospace",
-      fontSize: `${sw < 520 ? 12 : 15}px`,
-      color: "#f7fbff",
-      align: "center",
-      backgroundColor: "rgba(2, 5, 12, 0.58)",
-      padding: { left: 14, right: 14, top: 8, bottom: 8 },
-      wordWrap: { width: Math.min(650, sw - 34) }
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(902);
-    this.lawText = this.add.text(sw - 22, 20, "", {
-      fontFamily: "monospace",
-      fontSize: "13px",
-      color: "#9fb1bb",
-      align: "right",
-      lineSpacing: 5
-    }).setOrigin(1, 0).setScrollFactor(0).setDepth(901);
-    this.pauseBtn = this.add.text(sw - 16, 20, "❚❚", {
-      fontFamily: "monospace",
-      fontSize: `${screenW(this) < 520 ? 13 : 15}px`,
-      color: "#eefcff",
-      backgroundColor: "rgba(2, 5, 12, 0.72)",
-      padding: { left: 10, right: 10, top: 7, bottom: 7 }
-    }).setOrigin(1, 0.5).setScrollFactor(0).setDepth(903).setInteractive({ useHandCursor: true });
-    this.pauseBtn.on("pointerdown", () => this.pauseGame());
-    // Texto discreto "Modo Libre" cuando la run se inicia con Semilla Personalizada.
-    if (this.isCustomSeed) {
-      this.customSeedTag = this.add.text(24, 122, "Modo Libre: Progreso desactivado", {
-        fontFamily: "monospace",
-        fontSize: "11px",
-        color: "#ff4766",
-        backgroundColor: "rgba(4, 6, 11, 0.6)",
-        padding: { left: 6, right: 6, top: 3, bottom: 3 }
-      }).setScrollFactor(0).setDepth(902);
-    }
-    this.darkness = this.add.graphics().setScrollFactor(0).setDepth(850);
-    this.lightGlow = this.add.graphics().setScrollFactor(0).setDepth(851);
-    this.layoutHud();
-    this.scale.on("resize", this.layoutHud, this);
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scale.off("resize", this.layoutHud, this));
-  }
+  createHud() { return Hud.createHud(this); }
 
-  layoutHud() {
-    if (!this.hudBg) return;
-    const sw = screenW(this);
-    const sh = screenH(this);
-    const narrow = sw < 620 || sh < 460;
-    const short = sh < 460;
-    const fineHover = window.matchMedia("(pointer: fine)").matches && window.matchMedia("(hover: hover)").matches;
-    const likelyTouch = window.matchMedia("(pointer: coarse)").matches || window.matchMedia("(any-pointer: coarse)").matches || (navigator.maxTouchPoints > 0 && !fineHover) || sw < 640 || sh < 460;
-    const hudW = Math.max(280, Math.min(short ? 320 : (narrow ? sw - 24 : 468), sw - 24));
-    const hudH = narrow ? 92 : 102;
-    this.hudBg.setPosition(12, 12);
-    this.hudBg.setSize(hudW, hudH);
-    this.hudBg.displayWidth = hudW;
-    this.hudBg.displayHeight = hudH;
-    this.hudText.setPosition(24, 20);
-    this.hudText.setFontSize(narrow ? 11 : 14);
-    this.hudText.setWordWrapWidth(hudW - 22);
-    this.promptText.setOrigin(short ? 1 : 0.5, short ? 0 : 1);
-    this.promptText.setPosition(short ? sw - 12 : sw / 2, short ? 14 : sh - (likelyTouch ? 205 : 56));
-    this.promptText.setFontSize(narrow ? 12 : 15);
-    this.promptText.setWordWrapWidth(short ? Math.max(140, sw - hudW - 68) : Math.min(650, sw - 64));
-    this.lawText.setPosition(sw - 22, this.pauseBtn.y + this.pauseBtn.height / 2 + 12);
-    this.lawText.setVisible(sw >= 760 && !short);
-    if (this.customSeedTag) {
-      this.customSeedTag.setPosition(24, this.hudBg.y + this.hudBg.displayHeight + 6);
-    }
-  }
+  layoutHud() { return Hud.layoutHud(this); }
 
   pauseGame() {
     if (this.ending) return;
@@ -1865,70 +1785,7 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  updateHud(time, dt) {
-    const coinBurden = this.featherBoots ? 0 : effectiveCoinBurden(this.coins, this.meta);
-    const effectiveGravity = Math.round(this.physics.world.gravity.y + coinBurden * (this.debtMass || 1));
-    const speed = Math.round((playerMoveSpeed(this.featherBoots ? 0 : this.coins, this.meta, this.godPowerTimer) + (time < this.absorptionUntil ? 28 : 0)) * (this.carried ? 0.9 : 1));
-    const filledHearts = Math.max(0, Math.min(this.hp || 0, this.maxHp || 0));
-    const hearts = "♥".repeat(filledHearts) + "♡".repeat(Math.max(0, (this.maxHp || 0) - filledHearts));
-    const perception = time < this.doubtUntil ? `invertida ${Math.ceil((this.doubtUntil - time) / 1000)}s` : this.levelInfo.key === "jungle"
-      ? (this.perceptionTimer > 0 ? (this.inverted ? "invertida" : "expandida") : "clara")
-      : "clara";
-    const heat = this.levelInfo.key === "volcano" ? ` · Calor ${Math.round(this.heat)}%` : "";
-    const power = this.godPowerTimer > 0 ? ` · Fuego divino ${Math.ceil(this.godPowerTimer / 1000)}s` : "";
-    const absorption = time < this.absorptionUntil ? `\nAbsorción ${Math.ceil((this.absorptionUntil - time) / 1000)}s · Vel. +28 · Salto +48` : "";
-    const items = [this.featherBoots ? "🪶 Botas Pluma" : "", this.guardianMirror ? "🪞 Espejo Guardián" : "",
-      this.abyssBagCharges ? `🫙 Bolsa ${this.abyssBagCharges}` : "", this.certaintyAnchor ? "⚓ Ancla" : "", this.bottledPyre ? "🔥 Pira" : "",
-      time < this.riskJumpUntil ? `🌊 Salto del Pozo ${Math.ceil((this.riskJumpUntil - time) / 1000)}s` : "",
-      time < this.riskInvulnerableUntil ? `🛡️ Invulnerable ${Math.ceil((this.riskInvulnerableUntil - time) / 1000)}s` : "",
-      this.riskFog ? "🌫️ Visión -50%" : ""].filter(Boolean);
-    this.hudText.setText([
-      `Nivel ${this.worldNumber}-${this.substage} · ${this.levelInfo.name}`,
-      `${this.levelInfo.concept}`,
-      `Vida ${hearts} (${this.hp}/${this.maxHp}) · 🪙 Oro ${this.coins} · 💣 Bombas ${this.bombs} · 🧩 Fragmentos ${this.runFragments}`,
-      `Peso +${coinBurden}${this.creditPact ? " · Deuda +10%" : ""} · Vel. ${speed} · Gravedad ${effectiveGravity}`,
-      `Percepción: ${perception}${heat}${power}${absorption}${items.length ? `\nÍtems: ${items.join(" · ")}` : ""}`
-    ]);
-    this.hudBg.setSize(this.hudBg.width, this.hudText.height + 18);
-    this.lawText.setText(`INFLACIÓN M${this.worldNumber}: ${inflationMultiplier(this.worldNumber).toFixed(1)}x\n` +
-      LAW_DEFS.map(law => `${law.short} ${this.meta[law.key] ? (lawActive(this.meta, law.key) ? "●" : "○") : "·"}`).join("\n"));
-
-    this.nearPrompt = "";
-    if (this.graceAvailable) this.nearPrompt = "El camino se ha cerrado. E: Desvanecerse";
-    else if (this.carried) this.nearPrompt = `${this.carried.type === "symbolic" ? "Pensamiento" : "Objeto"} sostenido · »: lanzar · Abajo+»: depositar · E: soltar`;
-    else if (this.actionHoldStartedAt) this.nearPrompt = `Disolución del Ego ${Math.min(100, Math.round((time - this.actionHoldStartedAt) / 25))}%`;
-    else if (this.nearPortable) this.nearPrompt = "E: Levantar objeto";
-    else if (this.nearExit) this.nearPrompt = this.levelNumber === TOTAL_STAGES ? "E: trascender" : "E: seguir descendiendo";
-    else if (this.nearMerchant) {
-      this.nearPrompt = `MERCADER · ${this.merchantOffers()[this.merchantSelection].label} · E/Acción: comprar · »/Mayús: cambiar`;
-    }
-    else if (this.nearSpecial) this.nearPrompt = this.nearSpecial.used ? "La sala especial está en silencio." : this.nearSpecial.type === "barter"
-      ? "ALTAR DEL TRUEQUE · E: 8 oro → 2 vida, o 2 vida → 3 fragmentos"
-      : "POZO DEL RIESGO · E: poder temporal por visión y certeza";
-    else if (this.nearDramatic) {
-      this.nearPrompt = this.nearDramatic.unlocked
-        ? "Salto de renuncia: entrá y mantené el salto desde la flecha."
-        : `RUTA DRAMÁTICA · E: ${this.coins ? `ofrecer ${this.coins} monedas` : "ofrecer 1 vida"}${this.levelInfo.key === "volcano" ? " · » / Mayús: romper por 1 vida" : ""}`;
-    }
-    else if (this.nearAltar) {
-      const price = inflatedPrice(this.worldNumber);
-      this.nearPrompt = this.hp >= this.maxHp ? "El altar no puede curar una vida completa." :
-        this.coins >= price ? `E: curar 1 HP por ${price} monedas` : `El altar pide ${price} monedas por 1 HP.`;
-    }
-    else if (this.nearGod) this.nearPrompt = "E: negociar · » / Mayús: absorber poder arriesgado";
-    else if (this.nearSymbolic) this.nearPrompt = this.nearSymbolic.vulnerable(time)
-      ? `${this.nearSymbolic.names[this.nearSymbolic.kind]} · E: absorber (${this.coins >= 3 ? "3 monedas" : "1 vida"})`
-      : `${this.nearSymbolic.names[this.nearSymbolic.kind]} · » / Mayús: disipar`;
-    else if (this.levelInfo.key === "volcano") this.nearPrompt = "E: gastar 1 vida para romper muros cercanos";
-    else this.nearPrompt = "RUTA PRINCIPAL · El peso no cierra la salida.";
-    if (this.messageTimer > 0) {
-      this.messageTimer -= dt;
-      this.promptText.setText(this.currentMessage);
-    } else {
-      this.promptText.setText(this.nearPrompt);
-    }
-    this.promptText.setVisible(Boolean(this.promptText.text));
-  }
+  updateHud(time, dt) { return Hud.updateHud(this, time, dt); }
 
   updateLighting(time) {
     const sw = screenW(this);
@@ -2340,8 +2197,5 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  showMessage(text, duration = 1600) {
-    this.currentMessage = text;
-    this.messageTimer = duration;
-  }
+  showMessage(text, duration = 1600) { return Hud.showMessage(this, text, duration); }
 }
