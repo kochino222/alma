@@ -76,7 +76,30 @@ Reglas de Muerte y Salvaguardas (Edge Cases):
 
     Golpe Sísmico (Abajo + 'E'): Cuesta 1 HP. Incluye una guarda estricta: es imposible ejecutarlo si el jugador ya inició su secuencia de muerte. Si el costo de 1 HP resulta letal, el personaje ejecuta la explosión de roca e inmediatamente invoca la animación de muerte.
 
-    ## 7. Mecánicas RPG y Degradación de Objetos
+    ## 6. Detalles de Gameplay y Arte
+
+### 6.1. Hallazgo Principal (Animación)
+**No existe ningún sistema de animación.** Cada entidad tiene UNA sola textura estática, generada una única vez en `ArtData.generateBootTextures(scene)` (llamado en `BootScene.create()`, línea ~430). El jugador (`this.player`, un `physics.add.sprite`) hoy solo se manipula con:
+- `setFlipX(facing < 0)` — dirección
+- `setScale(scaleX, scaleY)` + tween a `(1,1)` vía `squashPlayer()` — squash/stretch en salto/aterrizaje/dash
+- `setTint(0xff5b67)` — flash de daño
+Esto es una buena noticia: no hay que migrar nada, solo **agregar** un sistema de variantes de textura y un wiring que las seleccione, sin tocar física ni colisiones.
+
+### 6.2. Roster de Enemigos (`SymbolicEntity`, 8 kinds)
+| kind | Nombre in-game | Mecánica clave | Sprite actual (`makeSymbolicEntity`) |
+|---|---|---|---|
+| `creditor` | El Acreedor | Persigue, lanza lazo (`lassoActiveUntil`) | rect + círculo cabeza + piernas |
+| `inflation` | La Inflación | Se "infla" (`ballooning`) y explota | rect + círculo cabeza + piernas (mismo branch que creditor) |
+| `doubt` | La Duda | Invierte controles al golpear (`doubtUntil`) | círculo + piernas |
+| `bias` | El Sesgo / Reflejo | Solo se mueve si `!observedByPlayer` (tipo estatua) | círculo + piernas (mismo branch que doubt) |
+| `impulse` | El Impulso Ciego | Carga y embiste (`chargeUntil`, `chargeVelocityY`) | triángulo |
+| `guilt` | La Culpa | Persigue en línea recta con "winding" (`targetX`) | triángulo (mismo branch que impulse) |
+| `dogma` | El Dogma | Pulsa (`pulseStart`) | rect + círculo genérico (branch default) |
+| `relativeVoid` | El Vacío Relativo | Vulnerable solo sin `attackAt` | rect + círculo genérico (branch default, **idéntico a dogma**) |
+
+**Deuda técnica detectada:** `dogma` y `relativeVoid` caen en el mismo `else` genérico → hoy son visualmente indistinguibles entre sí, y `creditor`/`inflation` comparten forma, igual que `doubt`/`bias` e `impulse`/`guilt`. En la práctica solo hay **4 siluetas para 8 enemigos**. Esto es exactamente lo que pide tu doc original ("el jugador debe poder reconocerlos antes de leer su nombre") — hoy no se cumple. Subtarea clara: una silueta única por kind, idealmente reflejando su mecánica (ej. `bias` con apariencia de espejo/estatua, `impulse` con pose de embestida).
+
+## 7. Mecánicas RPG y Degradación de Objetos
 El jugador ahora administra un inventario persistente. Los objetos (como las Botas Pluma o el Espejo) no son solo ventajas pasivas, sino entidades físicas y frágiles, representadas con íconos en el tablero/HUD.
 - **Probabilidad de Pérdida por Uso:** Las acciones extremas tienen un costo. Ejecutar habilidades como el *Golpe Sísmico* o recibir daño explosivo tiene un porcentaje de probabilidad de desgastar o destruir los objetos equipados.
 
@@ -91,5 +114,3 @@ La escenografía de las salas especiales evoluciona narrativamente con el descen
 - **Glosario Dinámico:** El menú de pausa incluirá una enciclopedia de lore (Enemigos, Biomas, Objetos, Leyes). La información es críptica al principio y se revela o amplía gradualmente a medida que el jugador interactúa con dichos elementos en sus partidas.
 - **Persistencia de Semillas:** El menú mostrará la semilla alfanumérica del mapa actual, sentando las bases para un sistema de guardado o para permitir a los jugadores compartir y repetir *runs* específicas.
 
-## Arquitectura (Nota Técnica)
-Todo el código fuente del juego y la escena principal han sido migrados a una estructura de *ES Modules* dentro de la carpeta `src/`. `GameScene` se compone de múltiples sistemas delegados (ver `hermes/architecture-reference.md`).
