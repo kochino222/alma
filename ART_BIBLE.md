@@ -183,3 +183,6 @@ AL TERMINAR: indicá qué campo usaste para cada transición de estado.
 - No se detectó ningún archivo CSS/HTML en lo que subiste — si la subtarea de UI necesita
   tocar la pantalla de inicio o el layout general, probablemente esté en el repo de GitHub
   que pasaste y no en estos dos archivos. Avisame cuando lleguemos a esa parte y lo reviso.
+
+## Arquitectura (Nota Técnica)
+Todo el código fuente del juego y la escena principal han sido migrados a una estructura de *ES Modules* dentro de la carpeta `src/`. `GameScene` se compone de múltiples sistemas delegados (ver `hermes/architecture-reference.md`).

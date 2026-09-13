@@ -90,3 +90,6 @@ La escenografía de las salas especiales evoluciona narrativamente con el descen
 ## 9. Menú de Pausa Extendido (Glosario y Metaprogreso)
 - **Glosario Dinámico:** El menú de pausa incluirá una enciclopedia de lore (Enemigos, Biomas, Objetos, Leyes). La información es críptica al principio y se revela o amplía gradualmente a medida que el jugador interactúa con dichos elementos en sus partidas.
 - **Persistencia de Semillas:** El menú mostrará la semilla alfanumérica del mapa actual, sentando las bases para un sistema de guardado o para permitir a los jugadores compartir y repetir *runs* específicas.
+
+## Arquitectura (Nota Técnica)
+Todo el código fuente del juego y la escena principal han sido migrados a una estructura de *ES Modules* dentro de la carpeta `src/`. `GameScene` se compone de múltiples sistemas delegados (ver `hermes/architecture-reference.md`).
