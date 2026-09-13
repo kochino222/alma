@@ -125,7 +125,14 @@
         if (coin) {
           const cBefore = scene.coins;
           scene.player.x = coin.x; scene.player.y = coin.y;
-          await new Promise(r => setTimeout(r, 250));
+
+          // Fase 4: forzar steps logicos de fisica + micro-esperas para
+          // evitar el flake por throttling de rAF (ventana en background).
+          for (let i = 0; i < 15; i++) {
+            scene.physics.world.step(16, 1000);
+            await new Promise(r => setTimeout(r, 20));
+          }
+
           coinsOk = scene.coins > cBefore;
         }
         out.monedas = { enMapa: coinCount, recogida: coinsOk };
