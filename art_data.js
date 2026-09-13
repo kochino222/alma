@@ -34,6 +34,13 @@ export const ArtData = (() => {
       this.makeLadder(scene);
       this.makeWall(scene);
       this.makeParticles(scene);
+      // UI procedural (HUD)
+      this.makeUIHealthActive(scene);
+      this.makeUIHealthEmpty(scene);
+      this.makeUIItemFeather(scene);
+      this.makeUIItemMirror(scene);
+      this.makeUIItemDynamite(scene);
+      this.makeUIItemDagger(scene);
     },
 
     makeTile: function(scene, key, colors) {
@@ -346,6 +353,164 @@ export const ArtData = (() => {
       dot.fillCircle(4, 4, 4);
       dot.generateTexture("particle-spore", 8, 8);
       dot.destroy();
+    },
+
+    // ===== UI procedural (HUD indie premium, sin imágenes externas) =====
+
+    makeUIHealthActive: function(scene) {
+      if (scene.textures.exists("ui-health-active")) return;
+      const g = scene.make.graphics({ x: 0, y: 0, add: false });
+      // Halo exterior suave
+      g.lineStyle(3, 0x7df7ff, 0.18);
+      g.beginPath();
+      g.moveTo(12, 1); g.lineTo(22, 12); g.lineTo(12, 23); g.lineTo(2, 12);
+      g.closePath(); g.strokePath();
+      // Cuerpo de la gema (rombo)
+      g.fillStyle(0x23c8d0, 1);
+      g.beginPath();
+      g.moveTo(12, 2); g.lineTo(21, 12); g.lineTo(12, 22); g.lineTo(3, 12);
+      g.closePath(); g.fillPath();
+      // Faceta superior (brillo)
+      g.fillStyle(0xaefaff, 0.85);
+      g.beginPath();
+      g.moveTo(12, 2); g.lineTo(21, 12); g.lineTo(12, 12);
+      g.closePath(); g.fillPath();
+      // Faceta inferior (sombra interna)
+      g.fillStyle(0x0f7f88, 0.55);
+      g.beginPath();
+      g.moveTo(3, 12); g.lineTo(12, 12); g.lineTo(12, 22);
+      g.closePath(); g.fillPath();
+      // Contorno oscuro para separar del fondo
+      g.lineStyle(2, 0x052a30, 1);
+      g.beginPath();
+      g.moveTo(12, 2); g.lineTo(21, 12); g.lineTo(12, 22); g.lineTo(3, 12);
+      g.closePath(); g.strokePath();
+      g.generateTexture("ui-health-active", 24, 24);
+      g.destroy();
+    },
+
+    makeUIHealthEmpty: function(scene) {
+      if (scene.textures.exists("ui-health-empty")) return;
+      const g = scene.make.graphics({ x: 0, y: 0, add: false });
+      // Gema apagada (mismo rombo, tonos grises)
+      g.fillStyle(0x1a2129, 1);
+      g.beginPath();
+      g.moveTo(12, 2); g.lineTo(21, 12); g.lineTo(12, 22); g.lineTo(3, 12);
+      g.closePath(); g.fillPath();
+      g.fillStyle(0x232b34, 1);
+      g.beginPath();
+      g.moveTo(12, 2); g.lineTo(21, 12); g.lineTo(12, 12);
+      g.closePath(); g.fillPath();
+      // Contorno gris apagado
+      g.lineStyle(2, 0x39434f, 1);
+      g.beginPath();
+      g.moveTo(12, 2); g.lineTo(21, 12); g.lineTo(12, 22); g.lineTo(3, 12);
+      g.closePath(); g.strokePath();
+      // Grietas (roto)
+      g.lineStyle(1, 0x0c1016, 1);
+      g.beginPath();
+      g.moveTo(8, 5); g.lineTo(13, 11); g.lineTo(9, 16);
+      g.moveTo(15, 8); g.lineTo(12, 14); g.lineTo(17, 18);
+      g.strokePath();
+      g.generateTexture("ui-health-empty", 24, 24);
+      g.destroy();
+    },
+
+    makeUIItemFeather: function(scene) {
+      if (scene.textures.exists("ui-item-feather")) return;
+      const g = scene.make.graphics({ x: 0, y: 0, add: false });
+      g.fillStyle(0xffd76a, 1);
+      g.fillEllipse(12, 12, 10, 20);
+      g.lineStyle(1, 0xe0a93c, 0.8);
+      g.beginPath();
+      g.moveTo(8, 6); g.lineTo(12, 12);
+      g.moveTo(7, 10); g.lineTo(12, 12);
+      g.moveTo(8, 14); g.lineTo(12, 12);
+      g.moveTo(7, 18); g.lineTo(12, 12);
+      g.moveTo(16, 6); g.lineTo(12, 12);
+      g.moveTo(17, 10); g.lineTo(12, 12);
+      g.moveTo(16, 14); g.lineTo(12, 12);
+      g.moveTo(17, 18); g.lineTo(12, 12);
+      g.strokePath();
+      g.lineStyle(2, 0xc9841f, 1);
+      g.beginPath();
+      g.moveTo(12, 3); g.lineTo(12, 21);
+      g.strokePath();
+      g.lineStyle(2, 0x2b1d08, 1);
+      g.strokeEllipse(12, 12, 10, 20);
+      g.generateTexture("ui-item-feather", 24, 24);
+      g.destroy();
+    },
+
+    makeUIItemMirror: function(scene) {
+      if (scene.textures.exists("ui-item-mirror")) return;
+      const g = scene.make.graphics({ x: 0, y: 0, add: false });
+      g.fillStyle(0xcfd9e6, 1);
+      g.fillEllipse(12, 12, 18, 20);
+      g.lineStyle(2, 0x1d2430, 1);
+      g.strokeEllipse(12, 12, 18, 20);
+      g.fillStyle(0x9fd4ff, 1);
+      g.fillEllipse(12, 12, 13, 15);
+      g.lineStyle(2, 0xeaf7ff, 0.9);
+      g.beginPath();
+      g.moveTo(7, 8); g.lineTo(13, 13);
+      g.strokePath();
+      g.lineStyle(1, 0xffffff, 0.9);
+      g.beginPath();
+      g.moveTo(6, 12); g.lineTo(10, 15);
+      g.strokePath();
+      g.generateTexture("ui-item-mirror", 24, 24);
+      g.destroy();
+    },
+
+    makeUIItemDynamite: function(scene) {
+      if (scene.textures.exists("ui-item-dynamite")) return;
+      const g = scene.make.graphics({ x: 0, y: 0, add: false });
+      g.fillStyle(0xc9403c, 1);
+      g.fillRoundedRect(4, 7, 6, 14, 2);
+      g.fillRoundedRect(9, 6, 6, 15, 2);
+      g.fillRoundedRect(14, 7, 6, 14, 2);
+      g.fillStyle(0x6e4a2a, 1);
+      g.fillRect(4, 7, 16, 3);
+      g.lineStyle(1, 0x2a0f0d, 1);
+      g.strokeRoundedRect(4, 7, 6, 14, 2);
+      g.strokeRoundedRect(9, 6, 6, 15, 2);
+      g.strokeRoundedRect(14, 7, 6, 14, 2);
+      g.lineStyle(2, 0xcba46d, 1);
+      g.beginPath();
+      g.moveTo(12, 6); g.lineTo(12, 2);
+      g.strokePath();
+      g.fillStyle(0xffd45e, 1);
+      g.fillCircle(12, 2, 2);
+      g.generateTexture("ui-item-dynamite", 24, 24);
+      g.destroy();
+    },
+
+    makeUIItemDagger: function(scene) {
+      if (scene.textures.exists("ui-item-dagger")) return;
+      const g = scene.make.graphics({ x: 0, y: 0, add: false });
+      g.fillStyle(0xd8e2ec, 1);
+      g.beginPath();
+      g.moveTo(12, 2); g.lineTo(15, 13); g.lineTo(9, 13);
+      g.closePath(); g.fillPath();
+      g.lineStyle(1, 0x7d8a99, 1);
+      g.beginPath();
+      g.moveTo(12, 2); g.lineTo(15, 13); g.lineTo(9, 13);
+      g.closePath(); g.strokePath();
+      g.lineStyle(1, 0xffffff, 0.9);
+      g.beginPath();
+      g.moveTo(12, 2); g.lineTo(15, 13);
+      g.strokePath();
+      g.fillStyle(0xd19a58, 1);
+      g.fillRect(7, 13, 10, 2);
+      g.lineStyle(1, 0x5a3a12, 1);
+      g.strokeRect(7, 13, 10, 2);
+      g.fillStyle(0x3a2a14, 1);
+      g.fillRect(10, 15, 4, 6);
+      g.fillStyle(0xd19a58, 1);
+      g.fillCircle(12, 21, 2);
+      g.generateTexture("ui-item-dagger", 24, 24);
+      g.destroy();
     },
 
     // Generador procedimental de Enemigos / Modelos Simbólicos
