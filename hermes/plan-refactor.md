@@ -161,7 +161,7 @@ Criterio de corte: **módulos que reciben `scene` como parámetro** (patrón "si
 - Ambos harness `OK` (25 checks + self-test 48 mapas). Flake pre-existente documentado: el check "recoger moneda" falla ~1 de cada 3-6 corridas por timing físico en headless (no es regresión).
 - Ejecutado por subagente `deepseek-v4-flash`; cierre (Tarea 12) por Herminia.
 
-### ⬜ Fase 4 — Cierre
+### ✅ Fase 4 — Cierre (COMPLETADA)
 - Actualizar `GDD.md` / `ART_BIBLE.md` con la nueva estructura.
 - Revisar `CODIGO_OPTIMIZADO.js` (¿obsoleto?) antes de borrarlo.
 - Consolidar o cerrar `separacion_arte` y `separacionboba`.
