@@ -5,6 +5,7 @@ import { screenW, screenH, clamp } from "../core/utils.js";
 import { LEVELS, LAW_DEFS, SAVE_KEY, DEFAULT_META } from "../core/constantes.js";
 import { loadMeta, saveMeta, resetRunFragmentBank, newRunId, lawUnlocked, lawActive } from "../core/guardado.js";
 import { AUDIO } from "../audio/AudioEngine.js";
+import { GamepadRig } from "../controles/GamepadRig.js";
 
 export class AstralScene extends Phaser.Scene {
   constructor() {
@@ -94,6 +95,17 @@ export class AstralScene extends Phaser.Scene {
     this.refresh();
     this.scale.on("resize", this.onAstralResize, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scale.off("resize", this.onAstralResize, this));
+    this.gamepad = new GamepadRig(this);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.gamepad?.destroy());
+  }
+
+  update() {
+    if (!this.gamepad) return;
+    const e = this.gamepad.readEdges();
+    if (e.up) this.moveSelect(-1);
+    if (e.down) this.moveSelect(1);
+    if (e.confirm) this.buySelected();
+    if (e.start) this.restartRun();
   }
 
   onAstralResize() {

@@ -1,7 +1,7 @@
 <!doctype html><html><head><meta charset="utf-8"><title>PENDIENTE</title></head><body>
 <pre id="v">corriendo…</pre>
 <script type="module">
-import { deadzone, readRawPad } from "../src/controles/GamepadRig.js";
+import { deadzone, readRawPad, computeEdges } from "../src/controles/GamepadRig.js";
 
 const pasos = [];
 const ok = (cond, nombre) => pasos.push({ paso: nombre, ok: !!cond });
@@ -65,6 +65,28 @@ const custom = { axes: [], buttons: Array.from({ length: 16 }, () => ({ pressed:
 custom.buttons[9].pressed = true;
 res = readRawPad(custom, { jump: 9, interact: 1, attack: 2, bomb: 3 });
 ok(res.jump === true && res.interact === false, "mapping custom → jump en índice 9");
+
+// Botones Start/Back (índices 8/9).
+btns.buttons[3].pressed = false;
+btns.buttons[9].pressed = true; res = readRawPad(btns);
+ok(res.start === true, "botón 9 (Start) → start");
+btns.buttons[9].pressed = false; btns.buttons[8].pressed = true; res = readRawPad(btns);
+ok(res.back === true, "botón 8 (Select) → back");
+btns.buttons[8].pressed = false;
+
+// computeEdges: flancos de menú (puro).
+let ce = computeEdges({ start: false }, { start: true });
+ok(ce.edges.start === true, "computeEdges: false→true → start edge");
+ce = computeEdges({ start: true }, { start: true });
+ok(ce.edges.start === false, "computeEdges: sostenido → sin edge");
+ce = computeEdges({ up: false, down: false }, { up: true });
+ok(ce.edges.up === true && ce.edges.down === false, "computeEdges: up edge");
+ce = computeEdges({ jump: false }, { jump: true });
+ok(ce.edges.confirm === true, "computeEdges: confirm (A/jump) edge");
+ce = computeEdges({ interact: false, back: false }, { back: true });
+ok(ce.edges.back === true, "computeEdges: back (Select) edge");
+ce = computeEdges({ interact: false, back: false }, { interact: true });
+ok(ce.edges.back === true, "computeEdges: back (B/interact) edge");
 
 const fallos = pasos.filter(p => !p.ok);
 document.title = fallos.length === 0 ? "OK" : `FALLO - ${fallos.length} pasos`;

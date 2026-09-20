@@ -228,6 +228,11 @@ export class GameScene extends Phaser.Scene {
     this.nearGod = false;
     this.resolveSlope();
     const controls = this.controls.read();
+    const padEdges = this.controls.gamepadRig.readEdges();
+    if (padEdges.start) {
+      this.pauseGame();
+      return;
+    }
     if (controls.bombPressed) this.deployBomb(time);
     this.updateProximity();
     if (!this.certaintyAnchor && (this.inverted || time < this.doubtUntil)) controls.axis *= -1;

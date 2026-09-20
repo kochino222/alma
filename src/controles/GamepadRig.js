@@ -8,7 +8,9 @@ export const DEFAULT_BUTTON_MAP = {
   jump: 0,      // A / Cross
   interact: 1,  // B / Circle
   attack: 2,    // X / Square
-  bomb: 3       // Y / Triangle
+  bomb: 3,      // Y / Triangle
+  start: 9,     // Start/Options
+  back: 8       // Select/Back
 };
 
 export const AXIS_CFG = {
@@ -66,8 +68,27 @@ export function readRawPad(padLike, map = DEFAULT_BUTTON_MAP, cfg = AXIS_CFG) {
     jump: buttonDown(padLike, map.jump),
     interact: buttonDown(padLike, map.interact),
     attack: buttonDown(padLike, map.attack),
-    bomb: buttonDown(padLike, map.bomb)
+    bomb: buttonDown(padLike, map.bomb),
+    start: buttonDown(padLike, map.start),
+    back: buttonDown(padLike, map.back)
   };
+}
+
+export const EMPTY_EDGES = { up: false, down: false, left: false, right: false, confirm: false, back: false, start: false };
+
+// Puro: dado el estado previo y el actual (held-state), devuelve los flancos.
+export function computeEdges(prev, cur) {
+  const p = prev || {};
+  const edges = {
+    up: !!(cur.up && !p.up),
+    down: !!(cur.down && !p.down),
+    left: !!(cur.left && !p.left),
+    right: !!(cur.right && !p.right),
+    confirm: !!(cur.jump && !p.jump),
+    back: !!(cur.interact && !p.interact) || !!(cur.back && !p.back),
+    start: !!(cur.start && !p.start)
+  };
+  return { edges, next: cur };
 }
 
 // Devuelve true si el pad está conectado. Acepta Phaser Gamepad o nativo.
@@ -84,6 +105,7 @@ export class GamepadRig {
     this.map = { ...DEFAULT_BUTTON_MAP };
     this._bindings = [];
     this._lastScan = 0;
+    this._edgePrev = null;
     this.install();
   }
 
@@ -195,11 +217,23 @@ export class GamepadRig {
     return readRawPad(this.toPadLike(pad), this.map);
   }
 
+  readEdges() {
+    const cur = this.read() || {};
+    if (!this._edgePrev) {
+      this._edgePrev = cur;
+      return { ...EMPTY_EDGES };
+    }
+    const { edges, next } = computeEdges(this._edgePrev, cur);
+    this._edgePrev = next;
+    return edges;
+  }
+
   destroy() {
     this._bindings.forEach(remove => remove());
     this._bindings.length = 0;
     this.pad = null;
     this.connected = false;
+    this._edgePrev = null;
     this.gamepad = null;
   }
 }
