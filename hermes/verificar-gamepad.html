@@ -1,0 +1,72 @@
+<!doctype html><html><head><meta charset="utf-8"><title>PENDIENTE</title></head><body>
+<pre id="v">corriendo…</pre>
+<script type="module">
+import { deadzone, readRawPad } from "../src/controles/GamepadRig.js";
+
+const pasos = [];
+const ok = (cond, nombre) => pasos.push({ paso: nombre, ok: !!cond });
+
+ok(deadzone(0, 0.25) === 0, "deadzone: centro → 0");
+ok(deadzone(0.1, 0.25) === 0, "deadzone: bajo umbral → 0");
+ok(deadzone(0.5, 0.25) === 0.5, "deadzone: sobre umbral → valor");
+ok(deadzone(-0.9, 0.25) === -0.9, "deadzone: negativo preservado");
+ok(deadzone(undefined, 0.25) === 0, "deadzone: undefined → 0");
+
+ok(readRawPad(null) === null, "readRawPad(null) → null");
+
+// Pad sin ejes ni botones (caso "no-isAxis"): NO lanza y da todo false.
+const vacio = { axes: [], buttons: [] };
+let res = readRawPad(vacio);
+ok(res && !res.left && !res.right && !res.up && !res.down && !res.jump, "pad sin ejes/botones → todo false");
+
+// Stick izquierdo → direcciones (analógico → digital con deadzone).
+const std = { axes: [-1, 0, 0, 0, 0, 0, 0, 0], buttons: Array.from({ length: 16 }, () => ({ pressed: false, value: 0 })) };
+res = readRawPad(std);
+ok(res.left === true && res.right === false, "stick X=-1 → left");
+std.axes[0] = 0.9; res = readRawPad(std);
+ok(res.right === true && res.left === false, "stick X=+0.9 → right");
+std.axes[0] = 0; std.axes[1] = -1; res = readRawPad(std);
+ok(res.up === true, "stick Y=-1 → up");
+std.axes[1] = 0.6; res = readRawPad(std);
+ok(res.down === true, "stick Y=+0.6 → down");
+std.axes[1] = 0;
+
+// Cruceta como botones 12-15 (estándar).
+std.buttons[14].pressed = true; res = readRawPad(std);
+ok(res.left === true, "dpad botón 14 → left");
+std.buttons[14].pressed = false; std.buttons[15].pressed = true; res = readRawPad(std);
+ok(res.right === true, "dpad botón 15 → right");
+std.buttons[15].pressed = false; std.buttons[12].pressed = true; res = readRawPad(std);
+ok(res.up === true, "dpad botón 12 → up");
+std.buttons[12].pressed = false; std.buttons[13].pressed = true; res = readRawPad(std);
+ok(res.down === true, "dpad botón 13 → down");
+std.buttons[13].pressed = false;
+
+// Cruceta como "hat" (ejes 6/7, valores -1/0/1) — Android genérico.
+const hat = { axes: [0, 0, 0, 0, 0, 0, 1, 0], buttons: [] };
+res = readRawPad(hat);
+ok(res.right === true && res.left === false, "hat X=+1 → right");
+hat.axes[6] = 0; hat.axes[7] = -1; res = readRawPad(hat);
+ok(res.up === true, "hat Y=-1 → up");
+
+// Botones por mapping estándar.
+const btns = { axes: [], buttons: Array.from({ length: 16 }, () => ({ pressed: false })) };
+btns.buttons[0].pressed = true; res = readRawPad(btns);
+ok(res.jump === true, "botón 0 (A) → jump");
+btns.buttons[0].pressed = false; btns.buttons[1].pressed = true; res = readRawPad(btns);
+ok(res.interact === true, "botón 1 (B) → interact");
+btns.buttons[1].pressed = false; btns.buttons[2].pressed = true; res = readRawPad(btns);
+ok(res.attack === true, "botón 2 (X) → attack");
+btns.buttons[2].pressed = false; btns.buttons[3].pressed = true; res = readRawPad(btns);
+ok(res.bomb === true, "botón 3 (Y) → bomb");
+
+// Mapping custom (no estándar).
+const custom = { axes: [], buttons: Array.from({ length: 16 }, () => ({ pressed: false })) };
+custom.buttons[9].pressed = true;
+res = readRawPad(custom, { jump: 9, interact: 1, attack: 2, bomb: 3 });
+ok(res.jump === true && res.interact === false, "mapping custom → jump en índice 9");
+
+const fallos = pasos.filter(p => !p.ok);
+document.title = fallos.length === 0 ? "OK" : `FALLO - ${fallos.length} pasos`;
+document.getElementById("v").textContent = JSON.stringify({ total: pasos.length, fallos: fallos.length, pasos }, null, 1);
+</script></body></html>
