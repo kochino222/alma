@@ -4,6 +4,7 @@
 import { AUDIO } from "../audio/AudioEngine.js";
 import { screenW, screenH, clamp } from "../core/utils.js";
 import { VIEW_W, VIEW_H } from "../core/constantes.js";
+import { GamepadRig } from "./GamepadRig.js";
 
 export class ControlRig {
   constructor(scene) {
@@ -38,6 +39,7 @@ export class ControlRig {
     scene.events.on(Phaser.Scenes.Events.PAUSE, this.releaseAll, this);
     scene.events.on(Phaser.Scenes.Events.SLEEP, this.releaseAll, this);
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, this.destroy, this);
+    this.gamepadRig = new GamepadRig(scene);
   }
 
   makeTouchControls() {
@@ -231,18 +233,19 @@ export class ControlRig {
 
   read() {
     const k = this.keys;
+    const gp = this.gamepadRig.read() || {};
     const leftKey = k.left.isDown || k.a.isDown;
     const rightKey = k.right.isDown || k.d.isDown;
     const upKey = k.up.isDown || k.w.isDown;
     const downKey = k.down.isDown || k.s.isDown;
-    const jump = k.jump.isDown || this.virtual.jump;
-    const interact = k.interact.isDown || this.virtual.interact;
-    const attack = k.attack.isDown || this.virtual.attack;
-    const bomb = k.bomb.isDown || this.virtual.bomb;
-    const left = leftKey || this.virtual.left;
-    const right = rightKey || this.virtual.right;
-    const up = upKey || this.virtual.up;
-    const down = downKey || this.virtual.down;
+    const jump = k.jump.isDown || this.virtual.jump || gp.jump;
+    const interact = k.interact.isDown || this.virtual.interact || gp.interact;
+    const attack = k.attack.isDown || this.virtual.attack || gp.attack;
+    const bomb = k.bomb.isDown || this.virtual.bomb || gp.bomb;
+    const left = leftKey || this.virtual.left || gp.left;
+    const right = rightKey || this.virtual.right || gp.right;
+    const up = upKey || this.virtual.up || gp.up;
+    const down = downKey || this.virtual.down || gp.down;
     const out = {
       left,
       right,
@@ -270,6 +273,7 @@ export class ControlRig {
   }
 
   destroy() {
+    this.gamepadRig?.destroy();
     this.releaseAll();
     this.nativeListeners.forEach(remove => remove());
     this.nativeListeners.length = 0;

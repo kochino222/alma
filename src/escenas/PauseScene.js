@@ -3,6 +3,7 @@
 
 import { screenW, screenH } from "../core/utils.js";
 import { AUDIO } from "../audio/AudioEngine.js";
+import { GamepadRig } from "../controles/GamepadRig.js";
 
 export class PauseScene extends Phaser.Scene {
   constructor() {
@@ -50,6 +51,14 @@ export class PauseScene extends Phaser.Scene {
     this.input.keyboard.on("keydown-P", this.resumeGame, this);
     this.scale.on("resize", this.layout, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scale.off("resize", this.layout, this));
+    this.gamepad = new GamepadRig(this);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.gamepad?.destroy());
+  }
+
+  update() {
+    if (!this.gamepad) return;
+    const e = this.gamepad.readEdges();
+    if (e.start || e.confirm || e.back) this.resumeGame();
   }
 
   layout() {

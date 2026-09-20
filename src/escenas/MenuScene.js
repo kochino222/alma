@@ -5,6 +5,7 @@ import { screenW, screenH } from "../core/utils.js";
 import { LEVELS, LAW_DEFS, SAVE_KEY, DEFAULT_META } from "../core/constantes.js";
 import { loadMeta, saveMeta, resetRunFragmentBank, newRunId } from "../core/guardado.js";
 import { AUDIO } from "../audio/AudioEngine.js";
+import { GamepadRig } from "../controles/GamepadRig.js";
 
 export class MenuScene extends Phaser.Scene {
   constructor() {
@@ -92,11 +93,7 @@ export class MenuScene extends Phaser.Scene {
 
     seedBtn.on("pointerdown", () => this.promptCustomSeed());
 
-    const startGame = () => {
-      AUDIO.unlock();
-      resetRunFragmentBank();
-      this.scene.start("Game", { level: 1, seed: `blank-${Date.now()}`, runId: newRunId(), coins: 0, fragments: 0, hp: 5, isCustomSeed: false });
-    };
+    const startGame = () => this.startRun();
     start.on("pointerdown", startGame);
     this.input.keyboard.once("keydown-ENTER", startGame);
     this.input.keyboard.once("keydown-SPACE", startGame);
@@ -117,6 +114,14 @@ export class MenuScene extends Phaser.Scene {
     });
     this.scale.on("resize", this.onMenuResize, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scale.off("resize", this.onMenuResize, this));
+    this.gamepad = new GamepadRig(this);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.gamepad?.destroy());
+  }
+
+  update() {
+    if (!this.gamepad) return;
+    const e = this.gamepad.readEdges();
+    if (e.start || e.confirm) this.startRun();
   }
 
   onMenuResize() {
@@ -129,6 +134,12 @@ export class MenuScene extends Phaser.Scene {
     if (value == null || String(value).trim() === "") return;
     resetRunFragmentBank();
     this.scene.start("Game", { level: 1, seed: String(value).trim(), runId: newRunId(), coins: 0, fragments: 0, hp: 5, isCustomSeed: true });
+  }
+
+  startRun() {
+    AUDIO.unlock();
+    resetRunFragmentBank();
+    this.scene.start("Game", { level: 1, seed: `blank-${Date.now()}`, runId: newRunId(), coins: 0, fragments: 0, hp: 5, isCustomSeed: false });
   }
 
   drawBackground() {

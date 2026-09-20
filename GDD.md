@@ -114,3 +114,31 @@ La escenografía de las salas especiales evoluciona narrativamente con el descen
 - **Glosario Dinámico:** El menú de pausa incluirá una enciclopedia de lore (Enemigos, Biomas, Objetos, Leyes). La información es críptica al principio y se revela o amplía gradualmente a medida que el jugador interactúa con dichos elementos en sus partidas.
 - **Persistencia de Semillas:** El menú mostrará la semilla alfanumérica del mapa actual, sentando las bases para un sistema de guardado o para permitir a los jugadores compartir y repetir *runs* específicas.
 
+---
+
+## Dirección de Arte
+
+### 1. Dirección de Arte y El Protagonista (El Alma en Blanco)
+El estilo visual adopta un enfoque de "Vector Orgánico" o ilustración digital limpia: bordes suaves y nítidos con sutiles difuminados (glow/bloom), evitando la cuadrícula estricta del pixel-art tradicional. 
+
+El protagonista está diseñado bajo una arquitectura de marioneta (*Paper-Doll Rig*):
+- **Anatomía "Cabezona" (Proporciones SD):** Cabeza prominente y redondeada que concentra la expresividad, contrastando con un cuerpo más frágil y ágil.
+- **Rostro y Rasgos:** No posee boca. Su rasgo más distintivo son unos ojos vacíos y luminosos (estilo *Hollow Knight*) que actúan como focos de luz. Presenta una textura de piel/superficie pálida y castigada, marcada por una cicatriz profunda (evocando deformidades trágicas, similar a mutaciones forzadas) y coronada por algunos pelos oscuros y canas esporádicas que denotan el paso del tiempo y el desgaste existencial.
+- **Vestimenta:** Lleva un taparrabos andrajoso que reacciona a las físicas del viento y la caída, enfatizando la sensación de despojo y vulnerabilidad material.
+
+### 2. Dirección de Entornos e Iluminación (Level Art)
+Los escenarios abandonan la abstracción geométrica para convertirse en Cavernas Vivas y Detalladas.
+- **Terreno Orgánico:** Los bloques destructibles y plataformas presentan detalles inmersivos pero legibles: parches de musgo, grietas de tensión térmica y calaveras incrustadas en la roca, sirviendo como advertencia de ciclos pasados.
+- **Arqueología y Objetos Enterrados:** El terreno oculta objetos usables y recursos bajo la superficie. El jugador debe usar explosivos o mecánicas de minería para desenterrarlos, fomentando la exploración destructiva.
+- **Oscuridad Dinámica (Mundos 1 y 2):** Los primeros niveles sufren de una privación de luz casi total. El entorno no está iluminado por defecto; la atmósfera se revela dinámicamente a través de la luz emisiva que proyectan los ojos del jugador, los objetos mágicos, las explosiones y los propios enemigos.
+
+### 3. Bestiario: Entidades de Sombra
+Se abandona la representación geométrica básica (círculos/cuadrados). Los enemigos ahora poseen formas literales y anatómicas que reflejan su pecado o concepto filosófico.
+- **Contraste de Sustancias:** Mientras el jugador está hecho de una materia pálida y luminosa, los enemigos están compuestos de "Sombras Purificadas" y oscuridad densa. Este contraste de valores (Blanco brillante vs. Negro abisal) asegura que las amenazas sean instantáneamente reconocibles en la penumbra de la cueva.
+
+### 6. Interfaz (HUD) y Experiencia de Usuario (UX)
+El diseño de interfaz huye del texto plano para abrazar una iconografía de fantasía oscura y moderna.
+- **HUD Minimalista (In-Game):** Inspirado en marcadores gráficos limpios (estilo *Dota 2* o *MU Online*). La salud se representa mediante indicadores cuantizados y estilizados (ej. gemas de sangre o marcas rúnicas) flotando en pantalla sin necesidad de barras de contención intrusivas.
+- **Menú de Pausa (Glassmorphism Oscuro):** Diseño moderno, translúcido y críptico. Un panel de cristal oscuro borroso (*background blur*) que desenfoca la acción congelada, con tipografía blanca, delgada y elegante.
+- **Transición de Datos (Fake Loading Screen):** Para justificar la adquisición de conocimientos en el Glosario y las Leyes, al cambiar de zona o acceder al menú profundo, el juego introduce una micro-pantalla de "asimilación" (1 a 2 segundos) donde el personaje procesa la información de la divinidad fría y calculadora que rige el abismo.
+

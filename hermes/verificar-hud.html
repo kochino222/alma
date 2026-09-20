@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Verificacion HUD - Alma en Blanco</title>
+  <link rel="stylesheet" href="../estilos.css">
+  <script>
+    window.__errs = [];
+    window.addEventListener("error", e => window.__errs.push("ERROR: " + (e.message || e.type)));
+    window.addEventListener("unhandledrejection", e => window.__errs.push("REJECTION: " + (e.reason && e.reason.message ? e.reason.message : e.reason)));
+  </script>
+</head>
+<body>
+  <div id="game-root"><div class="fallback">Preparando el descenso...</div></div>
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+  <script type="module" src="../juego.js"></script>
+  <script>
+    window.addEventListener("load", () => setTimeout(async () => {
+      const out = { pasos: [] };
+      const log = (k, v) => out.pasos.push({ paso: k, ok: v });
+      try {
+        const game = window.__BLANK_SOUL_GAME__;
+        if (!game) throw new Error("sin instancia de juego");
+        game.scene.stop("Menu");
+        await new Promise(r => setTimeout(r, 200));
+        game.scene.start("Game", { level: 1, seed: "verif-hud", runId: "verif-hud", coins: 0, fragments: 0, hp: 5, isCustomSeed: false });
+        await new Promise(r => setTimeout(r, 1200));
+        const scene = game.scene.getScene("Game");
+        if (!scene) throw new Error("GameScene no se creo");
+
+        const texKeys = ["ui-health-active", "ui-health-empty", "ui-item-feather", "ui-item-mirror", "ui-item-dynamite", "ui-item-dagger"];
+        out.texturas = Object.fromEntries(texKeys.map(k => [k, scene.textures.exists(k)]));
+        log("texturas UI generadas", texKeys.every(k => scene.textures.exists(k)));
+
+        out.healthIcons = scene.healthIcons?.length ?? -1;
+        out.itemIcons = scene.itemIcons?.length ?? -1;
+        out.hudBg = !!scene.hudBg;
+        log("5 iconos de vida", scene.healthIcons?.length === 5);
+        log("sin caja hudBg", !scene.hudBg);
+        log("textos HUD presentes", !!scene.hudText && !!scene.promptText && !!scene.lawText);
+
+        scene.hp = 3; scene.maxHp = 5;
+        scene.updateHud(scene.time.now, 0);
+        const hpTex = scene.healthIcons.map(s => s.icon.texture.key);
+        out.hp3de5 = hpTex;
+        log("3 activos + 2 vacios", hpTex[0] === "ui-health-active" && hpTex[1] === "ui-health-active" && hpTex[2] === "ui-health-active" && hpTex[3] === "ui-health-empty" && hpTex[4] === "ui-health-empty");
+
+        scene.hp = 4; scene.maxHp = 4;
+        scene.updateHud(scene.time.now, 0);
+        log("maxHp 4 oculta 5to icono", scene.healthIcons[4].icon.visible === false && scene.healthIcons[3].icon.visible === true);
+
+        scene.featherBoots = true; scene.guardianMirror = false; scene.bombs = 2;
+        scene.updateHud(scene.time.now, 0);
+        const vis = scene.itemIcons.map(s => s.icon.visible);
+        out.inventarioVis = vis;
+        log("inventario: pluma+dinamita visibles, espejo oculto", vis[0] === true && vis[1] === false && vis[2] === true);
+
+        out.errores = window.__errs;
+      } catch (e) {
+        out.excepcion = String(e && e.stack ? e.stack : e);
+      }
+      const pre = document.createElement("pre");
+      pre.id = "verificacion";
+      pre.textContent = JSON.stringify(out, null, 1);
+      document.body.appendChild(pre);
+      const errs = out.errores && out.errores.length;
+      const failed = out.pasos.filter(p => p.ok !== true);
+      document.title = out.excepcion ? "FALLO - excepcion" : (errs ? "FALLO - " + errs + " errores" : (failed.length ? "FALLO - " + failed.length + " pasos" : "OK"));
+    }, 2500));
+  </script>
+</body>
+</html>
